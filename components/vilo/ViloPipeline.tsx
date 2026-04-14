@@ -12,7 +12,7 @@ import { isDateBeforeToday } from "@/lib/dates";
 import { useCrmStore } from "@/lib/store";
 import type { ViloOpportunity } from "@/lib/types";
 import { cn } from "@/lib/cn";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ViloOpportunityForm } from "./ViloOpportunityForm";
 
 export function ViloPipeline() {
@@ -21,6 +21,11 @@ export function ViloPipeline() {
   const updateViloOpportunity = useCrmStore((s) => s.updateViloOpportunity);
   const deleteViloOpportunity = useCrmStore((s) => s.deleteViloOpportunity);
   const setViloStage = useCrmStore((s) => s.setViloStage);
+  const loadViloOpps = useCrmStore((s) => s.loadViloOpps);
+
+  useEffect(() => {
+    void loadViloOpps();
+  }, [loadViloOpps]);
 
   const [view, setView] = useState<"kanban" | "list">("kanban");
   const [filterStage, setFilterStage] = useState<ViloStage | "All">("All");
@@ -54,19 +59,29 @@ export function ViloPipeline() {
     setModalOpen(true);
   }
 
-  function handleSubmit(values: Omit<ViloOpportunity, "id" | "createdAt" | "updatedAt">) {
-    if (editing) {
-      updateViloOpportunity(editing.id, values);
-    } else {
-      addViloOpportunity(values);
+  async function handleSubmit(values: Omit<ViloOpportunity, "id" | "createdAt" | "updatedAt">) {
+    try {
+      if (editing) {
+        await updateViloOpportunity(editing.id, values);
+      } else {
+        await addViloOpportunity(values);
+      }
+      setModalOpen(false);
+      setEditing(null);
+    } catch (e) {
+      console.error(e);
+      window.alert(e instanceof Error ? e.message : "Could not save opportunity");
     }
-    setModalOpen(false);
-    setEditing(null);
   }
 
-  function handleDelete(o: ViloOpportunity) {
+  async function handleDelete(o: ViloOpportunity) {
     if (!window.confirm(`Delete opportunity for ${o.companyName}?`)) return;
-    deleteViloOpportunity(o.id);
+    try {
+      await deleteViloOpportunity(o.id);
+    } catch (e) {
+      console.error(e);
+      window.alert(e instanceof Error ? e.message : "Could not delete opportunity");
+    }
   }
 
   return (
@@ -171,7 +186,7 @@ export function ViloPipeline() {
               onDrop={(e) => {
                 e.preventDefault();
                 const id = e.dataTransfer.getData("text/plain");
-                if (id) setViloStage(id, stage);
+                if (id) void setViloStage(id, stage);
                 setDragId(null);
               }}
             >
@@ -235,7 +250,7 @@ export function ViloPipeline() {
                           <Select
                             className="min-w-0 flex-1 py-1 text-xs"
                             value={o.status}
-                            onChange={(e) => setViloStage(o.id, e.target.value as ViloStage)}
+                            onChange={(e) => void setViloStage(o.id, e.target.value as ViloStage)}
                             onClick={(e) => e.stopPropagation()}
                           >
                             {VILO_STAGES.map((s) => (

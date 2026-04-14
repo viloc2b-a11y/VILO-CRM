@@ -65,7 +65,7 @@ export function PatientLeadForm({
   onCancel,
 }: {
   initial?: PatientLead | null;
-  onSubmit: (values: Omit<PatientLead, "id" | "createdAt" | "updatedAt">) => void;
+  onSubmit: (values: Omit<PatientLead, "id" | "createdAt" | "updatedAt">) => void | Promise<void>;
   onCancel: () => void;
 }) {
   const [v, setV] = useState<LeadFormValues>({ ...empty });
@@ -78,10 +78,10 @@ export function PatientLeadForm({
     setV((s) => ({ ...s, [key]: val }));
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!v.fullName.trim() || !v.phone.trim()) return;
-    onSubmit({
+    await onSubmit({
       ...v,
       currentStage: v.currentStage as VitalisStage,
       firstOutreachAt: initial?.firstOutreachAt,

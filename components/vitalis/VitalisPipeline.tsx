@@ -12,7 +12,7 @@ import { isDateBeforeToday } from "@/lib/dates";
 import { useCrmStore } from "@/lib/store";
 import type { PatientLead } from "@/lib/types";
 import { cn } from "@/lib/cn";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PatientLeadForm } from "./PatientLeadForm";
 
 function langTone(lang: string): "vilo" | "vitalis" | "neutral" | "alert" | "success" {
@@ -37,6 +37,11 @@ export function VitalisPipeline() {
   const updatePatientLead = useCrmStore((s) => s.updatePatientLead);
   const deletePatientLead = useCrmStore((s) => s.deletePatientLead);
   const setVitalisStage = useCrmStore((s) => s.setVitalisStage);
+  const loadVitalisLeads = useCrmStore((s) => s.loadVitalisLeads);
+
+  useEffect(() => {
+    void loadVitalisLeads();
+  }, [loadVitalisLeads]);
 
   const [view, setView] = useState<"kanban" | "list">("kanban");
   const [filterStage, setFilterStage] = useState<VitalisStage | "All">("All");
@@ -73,19 +78,29 @@ export function VitalisPipeline() {
     setModalOpen(true);
   }
 
-  function handleSubmit(values: Omit<PatientLead, "id" | "createdAt" | "updatedAt">) {
-    if (editing) {
-      updatePatientLead(editing.id, values);
-    } else {
-      addPatientLead(values);
+  async function handleSubmit(values: Omit<PatientLead, "id" | "createdAt" | "updatedAt">) {
+    try {
+      if (editing) {
+        await updatePatientLead(editing.id, values);
+      } else {
+        await addPatientLead(values);
+      }
+      setModalOpen(false);
+      setEditing(null);
+    } catch (e) {
+      console.error(e);
+      window.alert(e instanceof Error ? e.message : "Could not save lead");
     }
-    setModalOpen(false);
-    setEditing(null);
   }
 
-  function handleDelete(l: PatientLead) {
+  async function handleDelete(l: PatientLead) {
     if (!window.confirm(`Delete lead ${l.fullName}?`)) return;
-    deletePatientLead(l.id);
+    try {
+      await deletePatientLead(l.id);
+    } catch (e) {
+      console.error(e);
+      window.alert(e instanceof Error ? e.message : "Could not delete lead");
+    }
   }
 
   return (
@@ -184,7 +199,7 @@ export function VitalisPipeline() {
               onDrop={(e) => {
                 e.preventDefault();
                 const id = e.dataTransfer.getData("text/plain");
-                if (id) setVitalisStage(id, stage);
+                if (id) void setVitalisStage(id, stage);
                 setDragId(null);
               }}
             >
@@ -245,7 +260,7 @@ export function VitalisPipeline() {
                           <Select
                             className="min-w-0 flex-1 py-1 text-xs"
                             value={l.currentStage}
-                            onChange={(e) => setVitalisStage(l.id, e.target.value as VitalisStage)}
+                            onChange={(e) => void setVitalisStage(l.id, e.target.value as VitalisStage)}
                             onClick={(e) => e.stopPropagation()}
                           >
                             {VITALIS_STAGES.map((s) => (

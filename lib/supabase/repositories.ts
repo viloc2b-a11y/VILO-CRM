@@ -1,5 +1,5 @@
 /**
- * Thin Supabase CRUD layer. Pass a client from `createClient()` / `createSupabaseBrowserClient()`
+ * Thin Supabase CRUD layer. Pass a client from `createClient()` (browser).
  * (after sign-in) or a server-side client with the user's JWT.
  * Does not modify Zustand or UI — call from hooks/sync jobs when ready.
  */

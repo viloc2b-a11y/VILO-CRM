@@ -2,12 +2,15 @@
 
 import { cn } from "@/lib/cn";
 import { isDateBeforeToday, isTaskOverdue } from "@/lib/dates";
+import { useAuth } from "@/hooks/useAuth";
 import { useCrmStore } from "@/lib/store";
+import { LogOut, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const nav = [
   { href: "/", label: "Dashboard", short: "Dash" },
+  { href: "/dashboard/sponsor", label: "Sponsor", short: "Spo" },
   { href: "/vilo", label: "Vilo Pipeline", short: "Vilo" },
   { href: "/vitalis", label: "Vitalis Pipeline", short: "Vit" },
   { href: "/contacts", label: "Contacts", short: "Contacts" },
@@ -16,6 +19,7 @@ const nav = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { profile, signOut, isAdmin } = useAuth();
   const collapsed = useCrmStore((s) => s.sidebarCollapsed);
   const toggleSidebar = useCrmStore((s) => s.toggleSidebar);
   const tasks = useCrmStore((s) => s.tasks);
@@ -96,6 +100,34 @@ export function Sidebar() {
           {overdueVitalis > 0 && <div>Vitalis overdue: {overdueVitalis}</div>}
         </div>
       )}
+
+      <div className="border-t border-clinical-line p-3">
+        {profile && (
+          <div className="mb-2 rounded-lg bg-clinical-paper px-3 py-2">
+            <div className="truncate text-xs font-semibold text-clinical-ink">{profile.full_name}</div>
+            <div className="text-[10px] uppercase tracking-wide text-clinical-muted">{profile.role}</div>
+          </div>
+        )}
+        <div className="flex gap-2">
+          {isAdmin && (
+            <Link
+              href="/admin"
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-clinical-line bg-clinical-paper px-2 py-1.5 text-xs font-medium text-clinical-ink hover:bg-vilo-50"
+            >
+              <ShieldCheck className="h-3.5 w-3.5" />
+              Admin
+            </Link>
+          )}
+          <button
+            type="button"
+            onClick={() => void signOut()}
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-clinical-line bg-clinical-paper px-2 py-1.5 text-xs font-medium text-clinical-muted hover:bg-red-50 hover:text-red-600"
+          >
+            <LogOut className="h-3.5 w-3.5" />
+            Sign out
+          </button>
+        </div>
+      </div>
     </aside>
   );
 }

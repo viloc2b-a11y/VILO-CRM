@@ -8,13 +8,18 @@ import { Select } from "@/components/ui/Select";
 import { PRIORITIES, TASK_CHANNELS, type Priority, type TaskChannel } from "@/lib/constants";
 import { isTaskOverdue } from "@/lib/dates";
 import { useCrmStore } from "@/lib/store";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 export function TasksPage() {
   const tasks = useCrmStore((s) => s.tasks);
   const addTask = useCrmStore((s) => s.addTask);
   const toggleTaskCompleted = useCrmStore((s) => s.toggleTaskCompleted);
   const deleteTask = useCrmStore((s) => s.deleteTask);
+  const loadTasks = useCrmStore((s) => s.loadTasks);
+
+  useEffect(() => {
+    void loadTasks();
+  }, [loadTasks]);
 
   const [title, setTitle] = useState("");
   const [dueAt, setDueAt] = useState("");
@@ -32,21 +37,26 @@ export function TasksPage() {
     });
   }, [tasks, filterChannel]);
 
-  function submitQuick(e: React.FormEvent) {
+  async function submitQuick(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim() || !dueAt) return;
     const local = new Date(dueAt);
-    addTask({
-      title: title.trim(),
-      dueAt: local.toISOString(),
-      channel,
-      priority,
-      completed: false,
-    });
-    setTitle("");
-    setDueAt("");
-    setChannel("vilo");
-    setPriority("Medium");
+    try {
+      await addTask({
+        title: title.trim(),
+        dueAt: local.toISOString(),
+        channel,
+        priority,
+        completed: false,
+      });
+      setTitle("");
+      setDueAt("");
+      setChannel("vilo");
+      setPriority("Medium");
+    } catch (err) {
+      console.error(err);
+      window.alert(err instanceof Error ? err.message : "Could not add task");
+    }
   }
 
   return (
@@ -133,10 +143,28 @@ export function TasksPage() {
                   {t.channel}
                 </Badge>
                 <Badge tone={t.priority === "High" ? "alert" : "neutral"}>{t.priority}</Badge>
-                <Button variant="secondary" className="px-2 py-1 text-xs" onClick={() => toggleTaskCompleted(t.id)}>
+                <Button
+                  variant="secondary"
+                  className="px-2 py-1 text-xs"
+                  onClick={() => {
+                    void toggleTaskCompleted(t.id).catch((err) => {
+                      console.error(err);
+                      window.alert(err instanceof Error ? err.message : "Could not update task");
+                    });
+                  }}
+                >
                   {t.completed ? "Undo" : "Done"}
                 </Button>
-                <Button variant="danger" className="px-2 py-1 text-xs" onClick={() => deleteTask(t.id)}>
+                <Button
+                  variant="danger"
+                  className="px-2 py-1 text-xs"
+                  onClick={() => {
+                    void deleteTask(t.id).catch((err) => {
+                      console.error(err);
+                      window.alert(err instanceof Error ? err.message : "Could not delete task");
+                    });
+                  }}
+                >
                   Delete
                 </Button>
               </div>

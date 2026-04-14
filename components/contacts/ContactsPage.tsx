@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { useCrmStore } from "@/lib/store";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type Tab = "organizations" | "contacts";
 
@@ -19,6 +19,13 @@ export function ContactsPage() {
   const updateContact = useCrmStore((s) => s.updateContact);
   const deleteOrganization = useCrmStore((s) => s.deleteOrganization);
   const deleteContact = useCrmStore((s) => s.deleteContact);
+  const loadOrganizations = useCrmStore((s) => s.loadOrganizations);
+  const loadContacts = useCrmStore((s) => s.loadContacts);
+
+  useEffect(() => {
+    void loadOrganizations();
+    void loadContacts();
+  }, [loadOrganizations, loadContacts]);
 
   const [tab, setTab] = useState<Tab>("organizations");
   const [quickOpen, setQuickOpen] = useState(false);
@@ -62,21 +69,26 @@ export function ContactsPage() {
     setContactRole("");
   }
 
-  function submitQuick(e: React.FormEvent) {
+  async function submitQuick(e: React.FormEvent) {
     e.preventDefault();
     if (!orgName.trim()) return;
-    const org = addOrganization({ name: orgName.trim(), website: orgWebsite.trim() || undefined });
-    if (contactName.trim()) {
-      addContact({
-        organizationId: org.id,
-        name: contactName.trim(),
-        email: contactEmail.trim() || undefined,
-        phone: contactPhone.trim() || undefined,
-        role: contactRole.trim() || undefined,
-      });
+    try {
+      const org = await addOrganization({ name: orgName.trim(), website: orgWebsite.trim() || undefined });
+      if (contactName.trim()) {
+        await addContact({
+          organizationId: org.id,
+          name: contactName.trim(),
+          email: contactEmail.trim() || undefined,
+          phone: contactPhone.trim() || undefined,
+          role: contactRole.trim() || undefined,
+        });
+      }
+      setQuickOpen(false);
+      resetQuick();
+    } catch (err) {
+      console.error(err);
+      window.alert(err instanceof Error ? err.message : "Could not save");
     }
-    setQuickOpen(false);
-    resetQuick();
   }
 
   return (
@@ -137,7 +149,12 @@ export function ContactsPage() {
                   className="px-2 py-1 text-xs"
                   onClick={() => {
                     const name = window.prompt("Organization name", o.name);
-                    if (name) updateOrganization(o.id, { name });
+                    if (name) {
+                      void updateOrganization(o.id, { name }).catch((err) => {
+                        console.error(err);
+                        window.alert(err instanceof Error ? err.message : "Could not update organization");
+                      });
+                    }
                   }}
                 >
                   Rename
@@ -147,7 +164,10 @@ export function ContactsPage() {
                   className="px-2 py-1 text-xs"
                   onClick={() => {
                     if (window.confirm(`Delete ${o.name}? Contacts under this org will be removed.`)) {
-                      deleteOrganization(o.id);
+                      void deleteOrganization(o.id).catch((err) => {
+                        console.error(err);
+                        window.alert(err instanceof Error ? err.message : "Could not delete organization");
+                      });
                     }
                   }}
                 >
@@ -187,7 +207,12 @@ export function ContactsPage() {
                       className="px-2 py-1 text-xs"
                       onClick={() => {
                         const name = window.prompt("Contact name", c.name);
-                        if (name) updateContact(c.id, { name });
+                        if (name) {
+                          void updateContact(c.id, { name }).catch((err) => {
+                            console.error(err);
+                            window.alert(err instanceof Error ? err.message : "Could not update contact");
+                          });
+                        }
                       }}
                     >
                       Edit
@@ -196,7 +221,12 @@ export function ContactsPage() {
                       variant="danger"
                       className="px-2 py-1 text-xs"
                       onClick={() => {
-                        if (window.confirm(`Delete ${c.name}?`)) deleteContact(c.id);
+                        if (window.confirm(`Delete ${c.name}?`)) {
+                          void deleteContact(c.id).catch((err) => {
+                            console.error(err);
+                            window.alert(err instanceof Error ? err.message : "Could not delete contact");
+                          });
+                        }
                       }}
                     >
                       Delete

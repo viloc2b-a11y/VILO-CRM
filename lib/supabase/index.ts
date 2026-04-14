@@ -1,4 +1,4 @@
-export { createClient, createSupabaseBrowserClient } from "./client";
+export { createClient } from "./client";
 export * from "./types";
 export * from "./mappers";
 export * from "./repositories";

@@ -1,22 +1,23 @@
 # Supabase — VILO CRM
 
-**Proyecto:** [ehxciiqxcolnqcohrbrx](https://supabase.com/dashboard/project/ehxciiqxcolnqcohrbrx) → SQL Editor.
+**Project:** [ehxciiqxcolnqcohrbrx](https://supabase.com/dashboard/project/ehxciiqxcolnqcohrbrx) → SQL Editor.
 
-**Schema v1.0:** enums (`org_type`, `priority_level`, `vilo_stage` con `Activated`, `opportunity_type`, `lead_source`, etc.), columnas `org_id` / `contact_id` / `linked_vilo_id` / `linked_vitalis_id`, tasks con `due_date` + `done` + `done_at`.
+**Schema v1.0:** enums (`org_type`, `priority_level`, `vilo_stage` including `Activated`, `opportunity_type`, `lead_source`, etc.), columns `org_id` / `contact_id` / `linked_vilo_id` / `linked_vitalis_id`, tasks with `due_date`, `done`, and `done_at`.
 
-## Orden de ejecución
+## Run order
 
-1. **[`01_schema.sql`](./01_schema.sql)** — esquema completo (enums, tablas, índices, vistas, triggers).
-2. **[`02_rls.sql`](./02_rls.sql)** — RLS + `GRANT` para `authenticated` y vistas.
+1. **[`01_schema.sql`](./01_schema.sql)** — full schema (enums, tables, indexes, views, triggers).
+2. **[`02_rls.sql`](./02_rls.sql)** — RLS + `GRANT` for `authenticated` and views.
+3. **[`03_sponsor_dashboard.sql`](./03_sponsor_dashboard.sql)** — sponsor reporting views and related objects (if not already applied with your baseline).
 
-## Otros archivos
+## Other files
 
-| Archivo | Uso |
-|---------|-----|
-| [`lib/supabase/types.ts`](../lib/supabase/types.ts) | Tipos `Database` + filas + joins sugeridos |
-| [`lib/supabase/client.ts`](../lib/supabase/client.ts) | `createSupabaseBrowserClient()` |
-| [`04_crud.ts`](./04_crud.ts) | Blueprint: orden de build, CRUD, auto-task, validaciones, Realtime |
+| File | Purpose |
+|------|---------|
+| [`lib/supabase/types.ts`](../lib/supabase/types.ts) | `Database` types + row shapes + suggested joins |
+| [`lib/supabase/client.ts`](../lib/supabase/client.ts) | Browser client: `createClient()` from `@supabase/ssr` |
+| [`04_crud.ts`](./04_crud.ts) | Blueprint: build order, CRUD patterns, auto-task notes, validation, Realtime ideas |
 
-## Variables de entorno
+## Environment variables
 
-Copia [`.env.example`](../.env.example) a `.env.local` (URL y anon key del proyecto **ehxciiqxcolnqcohrbrx**).
+Copy [`.env.example`](../.env.example) to `.env.local` and set the URL and anon key for project **ehxciiqxcolnqcohrbrx** (plus `SUPABASE_SERVICE_ROLE_KEY` for server API routes).

@@ -47,8 +47,6 @@ export async function updateViloOpportunity({ id, ...payload }: UpdateViloOpport
   validateViloOpportunityPatch(payload);
   const sb = createClient();
 
-  const { data: current } = await sb.from("vilo_opportunities").select("status, company_name").eq("id", id).single();
-
   const today = new Date().toISOString().slice(0, 10);
   const { data, error } = await sb
     .from("vilo_opportunities")
@@ -58,10 +56,7 @@ export async function updateViloOpportunity({ id, ...payload }: UpdateViloOpport
     .single();
   if (error) throw error;
 
-  if (current && payload.status && current.status !== payload.status && payload.status === "Feasibility Sent") {
-    const name = data.company_name ?? current.company_name ?? "";
-    await autoCreateFeasibilityTask(id, name);
-  }
+  /* Feasibility follow-up task: DB trigger `trg_feasibility_task` (see supabase/03_sponsor_dashboard.sql) */
   return data;
 }
 

@@ -214,6 +214,29 @@ export interface DashboardMetrics {
   tasks_overdue: number;
 }
 
+/** Auth extension: `public.user_profiles` */
+export interface UserProfileTable {
+  id: string;
+  full_name: string;
+  role: string;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Audit trail */
+export interface ActivityLogTable {
+  id: string;
+  user_id: string;
+  user_name: string;
+  action: string;
+  entity_type: string;
+  entity_id: string | null;
+  entity_label: string | null;
+  metadata: Json | null;
+  created_at: string;
+}
+
 // ── SUPABASE DATABASE TYPE (for createClient<Database> after `supabase gen types`) ─
 
 export interface Database {
@@ -247,6 +270,18 @@ export interface Database {
         Row: Task;
         Insert: InsertTask;
         Update: Partial<InsertTask>;
+        Relationships: [];
+      };
+      user_profiles: {
+        Row: UserProfileTable;
+        Insert: Omit<UserProfileTable, "created_at" | "updated_at"> & Partial<Pick<UserProfileTable, "created_at" | "updated_at">>;
+        Update: Partial<Omit<UserProfileTable, "id">>;
+        Relationships: [];
+      };
+      activity_log: {
+        Row: ActivityLogTable;
+        Insert: Omit<ActivityLogTable, "id" | "created_at"> & Partial<Pick<ActivityLogTable, "id" | "created_at">>;
+        Update: Partial<Omit<ActivityLogTable, "id" | "created_at">>;
         Relationships: [];
       };
     };

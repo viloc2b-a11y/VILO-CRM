@@ -15,7 +15,78 @@ import {
 } from "@/lib/dates";
 import { useCrmStore } from "@/lib/store";
 import Link from "next/link";
+import { FileText, BookOpen, ClipboardList, ExternalLink } from "lucide-react";
 import { useMemo } from "react";
+
+const DOCUMENTS = [
+  {
+    category: "Training",
+    items: [
+      {
+        title: "Staff Training Manual",
+        description:
+          "Complete guide for coordinators and BD team — stages, workflows, daily routine",
+        type: "docx",
+        icon: "book",
+        url: "/docs/VILO_CRM_Staff_Training_Manual.docx",
+      },
+      {
+        title: "WhatsApp Intake Flow",
+        description: "Message scripts A and B, form link format, campaign naming guide",
+        type: "pdf",
+        icon: "file",
+        url: "/docs/WhatsApp_Intake_Flow.pdf",
+      },
+    ],
+  },
+  {
+    category: "SOPs",
+    items: [
+      {
+        title: "Patient Lead SOP",
+        description:
+          "Standard operating procedure — lead intake, contact timeline, stage transitions",
+        type: "docx",
+        icon: "clipboard",
+        url: "/docs/SOP_Patient_Lead.docx",
+      },
+      {
+        title: "Screen Fail Protocol",
+        description: "How to record screen fails, required fields, recycling to Nurture",
+        type: "docx",
+        icon: "clipboard",
+        url: "/docs/SOP_Screen_Fail.docx",
+      },
+      {
+        title: "Feasibility Response SOP",
+        description: "How to complete and return feasibility questionnaires for CROs",
+        type: "docx",
+        icon: "clipboard",
+        url: "/docs/SOP_Feasibility.docx",
+      },
+    ],
+  },
+  {
+    category: "Templates",
+    items: [
+      {
+        title: "Sponsor Outreach Email",
+        description: "Email template for cold and warm outreach to CROs and sponsors",
+        type: "docx",
+        icon: "file",
+        url: "/docs/Template_Sponsor_Outreach.docx",
+      },
+      {
+        title: "Site Capabilities One-Pager",
+        description:
+          "One-page site profile for sponsors — patient population, bilingual access, metrics",
+        type: "pdf",
+        icon: "file",
+        url: "/docs/Site_Capabilities.pdf",
+      },
+    ],
+  },
+];
 
 export function Dashboard() {
   const opps = useCrmStore((s) => s.viloOpportunities);
@@ -296,6 +367,57 @@ export function Dashboard() {
               </div>
             ))
           )}
+        </CardBody>
+      </Card>
+
+      <Card className="mt-6">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <div className="text-sm font-semibold text-clinical-ink">Documents</div>
+            <div className="text-xs text-clinical-muted">SOPs, training materials, and templates</div>
+          </div>
+        </CardHeader>
+        <CardBody className="space-y-6 pt-2">
+          {DOCUMENTS.map((group) => (
+            <div key={group.category}>
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-clinical-muted">
+                {group.category}
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {group.items.map((doc) => (
+                  <a
+                    key={doc.title}
+                    href={doc.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-start gap-3 rounded-lg border border-clinical-line bg-clinical-paper px-3 py-3 text-sm transition-colors hover:border-vilo-400 hover:bg-vilo-50"
+                  >
+                    <div className="mt-0.5 shrink-0 text-vilo-600">
+                      {doc.icon === "book" ? (
+                        <BookOpen className="h-4 w-4" />
+                      ) : doc.icon === "clipboard" ? (
+                        <ClipboardList className="h-4 w-4" />
+                      ) : (
+                        <FileText className="h-4 w-4" />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate font-medium text-clinical-ink">{doc.title}</span>
+                        <ExternalLink className="h-3 w-3 shrink-0 text-clinical-muted" />
+                      </div>
+                      <div className="mt-0.5 text-xs text-clinical-muted line-clamp-2">{doc.description}</div>
+                      <div className="mt-1.5">
+                        <span className="inline-block rounded bg-clinical-line px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-clinical-muted">
+                          {doc.type}
+                        </span>
+                      </div>
+                    </div>
+                  </a>
+                ))}
+              </div>
+            </div>
+          ))}
         </CardBody>
       </Card>
     </div>
