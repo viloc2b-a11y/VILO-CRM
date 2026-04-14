@@ -33,4 +33,4 @@ npm start
 
 ## Data note
 
-This MVP stores data in the browser (`localStorage`). For team-wide or backed-up data, plan a migration to a database API (for example Supabase or Postgres) behind the same UI.
+This MVP stores data in the browser (`localStorage`). **Supabase:** run [`supabase/01_schema.sql`](./supabase/01_schema.sql) then [`supabase/02_rls.sql`](./supabase/02_rls.sql) in the [SQL editor](https://supabase.com/dashboard/project/ehxciiqxcolnqcohrbrx/sql/new). See [`supabase/INTEGRATION.md`](./supabase/INTEGRATION.md). Copy [`.env.example`](./.env.example) to `.env.local`. Types: [`lib/supabase/types.ts`](./lib/supabase/types.ts); client: [`lib/supabase/client.ts`](./lib/supabase/client.ts); blueprint: [`supabase/04_crud.ts`](./supabase/04_crud.ts).
