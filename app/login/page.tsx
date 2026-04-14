@@ -1,6 +1,7 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
+import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 
@@ -39,11 +40,14 @@ function LoginForm() {
     <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
       <div className="w-full max-w-sm rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex items-center justify-center">
-            <img
+          <div className="mx-auto mb-4 flex items-center justify-center rounded-2xl bg-[#0d1b35] p-4">
+            <Image
               src="/vilo-logo.png"
               alt="Vilo Research Group"
-              className="h-20 w-auto object-contain"
+              width={280}
+              height={80}
+              className="h-16 w-auto object-contain"
+              priority
             />
           </div>
           <h1 className="text-xl font-bold text-gray-900">VILO CRM</h1>

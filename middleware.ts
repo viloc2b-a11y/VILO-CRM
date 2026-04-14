@@ -4,7 +4,6 @@ import { type NextRequest, NextResponse } from "next/server";
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // Public files from /public must not require auth (e.g. login page images).
   const isPublicAsset =
     pathname.startsWith("/docs/") ||
     pathname === "/favicon.ico" ||
@@ -39,7 +38,13 @@ export async function middleware(req: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (pathname.startsWith("/login") || pathname.startsWith("/intake") || pathname.startsWith("/api")) {
+  if (
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/intake") ||
+    pathname.startsWith("/api") ||
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/docs")
+  ) {
     return response;
   }
 
@@ -56,6 +61,7 @@ export async function middleware(req: NextRequest) {
     if (profile?.role !== "admin") {
       const url = req.nextUrl.clone();
       url.pathname = "/";
+      url.search = "";
       return NextResponse.redirect(url);
     }
   }

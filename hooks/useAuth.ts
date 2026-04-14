@@ -18,46 +18,60 @@ export function useAuth() {
   const sb = useMemo(() => createClient(), []);
 
   useEffect(() => {
-    let cancelled = false;
+    // Get initial session
+    void sb.auth.getSession().then(
+      ({ data: { session } }) => {
+        const u = session?.user ?? null;
+        setUser(u);
+        if (u) {
+          void sb
+            .from("user_profiles")
+            .select("*")
+            .eq("id", u.id)
+            .single()
+            .then(
+              ({ data }) => {
+                if (data) setProfile(data as UserProfile);
+                setLoading(false);
+              },
+              () => setLoading(false)
+            );
+        } else {
+          setLoading(false);
+        }
+      },
+      () => setLoading(false)
+    );
 
-    async function loadProfileForUser(u: User | null) {
-      if (!u) {
-        setProfile(null);
-        return;
-      }
-      const { data: p } = await sb.from("user_profiles").select("*").eq("id", u.id).single();
-      if (!cancelled) setProfile(p as UserProfile | null);
-    }
-
-    async function init() {
-      const {
-        data: { user: u },
-      } = await sb.auth.getUser();
-      if (cancelled) return;
-      setUser(u);
-      await loadProfileForUser(u);
-      if (!cancelled) setLoading(false);
-    }
-
-    void init();
-
+    // Listen for auth changes
     const {
       data: { subscription },
-    } = sb.auth.onAuthStateChange(async (_event, session) => {
+    } = sb.auth.onAuthStateChange((event, session) => {
       const u = session?.user ?? null;
       setUser(u);
-      await loadProfileForUser(u);
+      if (event === "SIGNED_OUT") {
+        setProfile(null);
+        setLoading(false);
+        return;
+      }
+      if (u && (event === "SIGNED_IN" || event === "TOKEN_REFRESHED")) {
+        void sb
+          .from("user_profiles")
+          .select("*")
+          .eq("id", u.id)
+          .single()
+          .then(({ data }) => {
+            if (data) setProfile(data as UserProfile);
+          });
+      }
     });
 
-    return () => {
-      cancelled = true;
-      subscription.unsubscribe();
-    };
+    return () => subscription.unsubscribe();
   }, [sb]);
 
   async function signOut() {
     await sb.auth.signOut();
-    window.location.href = "/login";
+    window.location.replace("/login");
   }
 
   const isAdmin = profile?.role === "admin";
