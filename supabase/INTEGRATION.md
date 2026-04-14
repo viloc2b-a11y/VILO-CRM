@@ -9,6 +9,15 @@
 1. **[`01_schema.sql`](./01_schema.sql)** — full schema (enums, tables, indexes, views, triggers).
 2. **[`02_rls.sql`](./02_rls.sql)** — RLS + `GRANT` for `authenticated` and views.
 3. **[`03_sponsor_dashboard.sql`](./03_sponsor_dashboard.sql)** — sponsor reporting views and related objects (if not already applied with your baseline).
+4. **[`05_auth_rbac_activity.sql`](./05_auth_rbac_activity.sql)** — `user_profiles` (roles: `admin`, `bd`, `coordinator`, `viewer`), `activity_log`, RLS, `is_app_admin()`, trigger on `auth.users` to create a profile row. **Required** for `/login`, `/admin`, and sidebar identity.
+
+After creating the first user in **Authentication → Users**, set an admin:
+
+```sql
+UPDATE user_profiles
+SET role = 'admin'
+WHERE id = (SELECT id FROM auth.users WHERE email = 'your-email@example.com');
+```
 
 ## Other files
 

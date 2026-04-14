@@ -1,6 +1,6 @@
 # VILO CRM
 
-Operational CRM for **Vilo Research Group** (B2B pipeline) and **Vitalis** (B2C patient leads). Single Next.js app with two pipelines, tasks, contacts, sponsor analytics, and a public intake endpoint.
+Operational CRM for **Vilo Research Group** (B2B pipeline) and **Vitalis** (B2C patient leads). Single Next.js app with two pipelines, tasks, contacts, sponsor analytics, **Supabase Auth** (login + roles), an admin panel, and a public intake endpoint.
 
 **Repository:** [github.com/viloc2b-a11y/VILO-CRM](https://github.com/viloc2b-a11y/VILO-CRM)
 
@@ -10,6 +10,7 @@ Operational CRM for **Vilo Research Group** (B2B pipeline) and **Vitalis** (B2C 
 - **Supabase** — Postgres for CRM entities and sponsor views; [`@supabase/ssr`](https://supabase.com/docs/guides/auth/server-side/nextjs) for browser/server clients, [`@supabase/supabase-js`](https://supabase.com/docs/reference/javascript/introduction) for the server-only service client
 - **Zustand** — UI and client cache; **`localStorage`** only for `sidebarCollapsed` (CRM rows are loaded from Supabase, not persisted in the browser)
 - **[`lucide-react`](https://lucide.dev/)** — Icons (e.g. [`components/dashboard/Dashboard.tsx`](./components/dashboard/Dashboard.tsx) Documents section)
+- **Auth** — [`middleware.ts`](./middleware.ts) protects app routes; [`app/login/page.tsx`](./app/login/page.tsx); profiles and activity log in [`supabase/05_auth_rbac_activity.sql`](./supabase/05_auth_rbac_activity.sql) (run in Supabase after `01`–`03`)
 
 ## Environment
 
@@ -41,7 +42,9 @@ npm start
 
 | Path | Description |
 |------|-------------|
-| `/` | Home — operational **Dashboard** (Vilo / Vitalis metrics, pending tasks, **Documents** card with links to training, SOPs, and templates under `/docs/…`) |
+| `/login` | Sign in (email/password); unauthenticated users are redirected here |
+| `/` | Home — operational **Dashboard** (requires auth; Vilo / Vitalis metrics, pending tasks, **Documents** card with links under `/docs/…`) |
+| `/admin` | **Admin only** — team members, roles, activity log (`user_profiles` + `activity_log`) |
 | `/vilo` | B2B opportunity pipeline |
 | `/vitalis` | B2C patient leads |
 | `/contacts` | Organizations + contacts (Vilo) |
@@ -60,6 +63,8 @@ Server handlers use **`serviceClient`** from [`lib/supabase/service-role.ts`](./
 | `GET /api/reports/sponsor` | Weekly sponsor report + sources + screen-fail snippet + bilingual `sponsor_message` |
 | `PATCH /api/tasks/[id]` | Toggle `done` on a task row |
 | `POST` / `GET /api/cron/check-automations` | Automation checks (Vercel cron; see [`vercel.json`](./vercel.json)) |
+| `POST /api/activity` | Authenticated CRM actions → `activity_log` (used by the store; non-fatal errors still return 200) |
+| `POST /api/admin/create-user` | **Admin only** — creates Auth user + profile (service role) |
 
 ## Project layout
 
@@ -71,11 +76,11 @@ Server handlers use **`serviceClient`** from [`lib/supabase/service-role.ts`](./
 | `lib/store.ts` | Zustand store + async loaders/mutations calling `lib/db/*` |
 | `lib/db/` | Thin modules: `vilo`, `vitalis`, `tasks`, `contacts`, `organizations`, `dashboard` (Supabase reads/writes) |
 | `lib/supabase/` | `client.ts` (browser), `server.ts` (cookies), `service-role.ts`, mappers, types |
-| `supabase/` | Reference SQL: schema, RLS, sponsor views (`01_schema.sql`, `02_rls.sql`, `03_sponsor_dashboard.sql`) |
+| `supabase/` | Reference SQL: `01_schema.sql`, `02_rls.sql`, `03_sponsor_dashboard.sql`, **`05_auth_rbac_activity.sql`** (profiles + activity + trigger) |
 
 ## Database
 
-Apply the SQL files in order in the [Supabase SQL editor](https://supabase.com/dashboard) for your project (schema is owned in Supabase; this repo does not migrate production for you). RLS and views are documented alongside the scripts.
+Apply the SQL files **in order** in the [Supabase SQL editor](https://supabase.com/dashboard): **`01` → `02` → `03` → `05`**. Without **`05`**, login and `user_profiles` / `activity_log` will not match the app. After the first deploy, promote one user to `admin` in `user_profiles` (see [`supabase/INTEGRATION.md`](./supabase/INTEGRATION.md)).
 
 More detail: [`supabase/INTEGRATION.md`](./supabase/INTEGRATION.md). Generated / hand-maintained table typings: [`lib/supabase/types.ts`](./lib/supabase/types.ts).
 
