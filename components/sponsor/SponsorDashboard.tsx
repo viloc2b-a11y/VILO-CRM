@@ -406,9 +406,27 @@ export function SponsorDashboard() {
 
         {tab === "report" && rep && (
           <>
-            <h2 style={{ fontSize: 13, fontWeight: 800, color: MUTED, textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 12px" }}>
-              Weekly snapshot
-            </h2>
+            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12, marginBottom: 12 }}>
+              <h2 style={{ fontSize: 13, fontWeight: 800, color: MUTED, textTransform: "uppercase", letterSpacing: "0.06em", margin: 0 }}>
+                Weekly snapshot
+              </h2>
+              <a
+                href="/api/reports/sponsor/pdf"
+                download
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 8,
+                  border: `1px solid ${BLU}`,
+                  background: "rgba(56,189,248,0.12)",
+                  color: BLU,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  textDecoration: "none",
+                }}
+              >
+                Download PDF report
+              </a>
+            </div>
             <div
               style={{
                 display: "grid",

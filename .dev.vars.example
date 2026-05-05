@@ -1,0 +1,4 @@
+# Copiar a .dev.vars (gitignored) para `wrangler pages dev`.
+# CRON_SECRET=tu_valor_local
+
+CRON_SECRET=

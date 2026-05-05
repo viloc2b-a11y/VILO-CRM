@@ -10,6 +10,9 @@ export const VILO_STAGES = [
   "Nurture",
 ] as const;
 
+import type { VitalisStage as VitalisStageDb } from "@/lib/supabase/types";
+
+/** Orden UI/filtros; debe coincidir con `vitalis_stage` en BD y `VitalisStage` en `lib/supabase/types.ts`. */
 export const VITALIS_STAGES = [
   "New Lead",
   "Contact Attempted",
@@ -17,11 +20,13 @@ export const VITALIS_STAGES = [
   "Prescreen Started",
   "Prequalified",
   "Scheduled",
+  "Visit Confirmed",
   "No-show",
   "Enrolled",
   "Screen Fail",
+  "Patient Lost",
   "Nurture / Future Study",
-] as const;
+] as const satisfies readonly VitalisStageDb[];
 
 export type ViloStage = (typeof VILO_STAGES)[number];
 export type VitalisStage = (typeof VITALIS_STAGES)[number];

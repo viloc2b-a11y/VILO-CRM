@@ -6,16 +6,28 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:webhook": "tsx scripts/test-webhook.ts",
+    "test:square-webhook": "tsx scripts/test-square-webhook.ts",
+    "test:whatsapp": "tsx scripts/test-whatsapp.ts"
   },
   "dependencies": {
+    "@react-pdf/font": "^4.0.8",
+    "@react-pdf/renderer": "^4.5.1",
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.49.1",
     "clsx": "^2.1.1",
+    "date-fns": "^4.1.0",
     "lucide-react": "^1.8.0",
     "next": "^15.1.0",
+    "pdf-lib": "^1.17.1",
+    "pdf-parse": "^2.4.5",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "sharp": "^0.34.5",
+    "stripe": "^22.1.0",
+    "tesseract.js": "^7.0.0",
+    "zod": "^4.4.1",
     "zustand": "^5.0.3"
   },
   "devDependencies": {
@@ -26,6 +38,7 @@
     "eslint-config-next": "^15.1.0",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.16",
+    "tsx": "^4.19.2",
     "typescript": "^5.7.2"
   }
 }

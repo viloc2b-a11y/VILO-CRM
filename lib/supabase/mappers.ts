@@ -241,6 +241,11 @@ export function viloRowToApp(row: ViloOpportunityRow): ViloOpportunity {
     negotiationEnteredAt: undefined,
     closedWonAt: undefined,
     closedLostAt: undefined,
+    decisionMakerRole: row.decision_maker_role ?? undefined,
+    lastInteractionType: row.last_interaction_type ?? undefined,
+    nextFollowUp: row.next_follow_up ?? undefined,
+    relationshipStrength: row.relationship_strength ?? undefined,
+    enrichmentStatus: row.enrichment_status ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -265,6 +270,11 @@ export function viloToDbInsert(o: Omit<ViloOpportunity, "id" | "createdAt" | "up
     potential_value: o.potentialValue ? Number.parseFloat(o.potentialValue) : null,
     priority: o.priority as ViloOpportunityRow["priority"],
     archived: false,
+    decision_maker_role: o.decisionMakerRole ?? null,
+    last_interaction_type: o.lastInteractionType ?? null,
+    next_follow_up: o.nextFollowUp ?? null,
+    relationship_strength: o.relationshipStrength ?? null,
+    enrichment_status: (o.enrichmentStatus as ViloOpportunityRow["enrichment_status"]) ?? "pending",
   };
   return o.id ? { ...base, id: o.id } : base;
 }
@@ -288,6 +298,11 @@ export function viloToDbUpdate(patch: Partial<ViloOpportunity>): Record<string, 
   if (patch.potentialValue !== undefined)
     out.potential_value = patch.potentialValue ? Number.parseFloat(patch.potentialValue) : null;
   if (patch.priority !== undefined) out.priority = patch.priority;
+  if (patch.decisionMakerRole !== undefined) out.decision_maker_role = patch.decisionMakerRole || null;
+  if (patch.lastInteractionType !== undefined) out.last_interaction_type = patch.lastInteractionType || null;
+  if (patch.nextFollowUp !== undefined) out.next_follow_up = patch.nextFollowUp || null;
+  if (patch.relationshipStrength !== undefined) out.relationship_strength = patch.relationshipStrength ?? null;
+  if (patch.enrichmentStatus !== undefined) out.enrichment_status = patch.enrichmentStatus || null;
   return out;
 }
 

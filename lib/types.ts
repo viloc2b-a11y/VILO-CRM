@@ -42,6 +42,12 @@ export interface ViloOpportunity {
   negotiationEnteredAt?: string;
   closedWonAt?: string;
   closedLostAt?: string;
+  /** B2B — `38_vilo_b2b_forecast.sql` */
+  decisionMakerRole?: string;
+  lastInteractionType?: string;
+  nextFollowUp?: string;
+  relationshipStrength?: number;
+  enrichmentStatus?: string;
   createdAt: string;
   updatedAt: string;
 }

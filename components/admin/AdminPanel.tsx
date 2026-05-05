@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { useAuth } from "@/hooks/useAuth";
 import { createClient } from "@/lib/supabase/client";
+import type { AgentAutomationSetting, AgentExecutionLog } from "@/lib/supabase/types";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -12,6 +13,7 @@ interface UserProfile {
   full_name: string;
   role: string;
   active: boolean;
+  allowed_business_units?: string[];
   created_at: string;
   email?: string;
 }
@@ -62,7 +64,7 @@ export function AdminPanel() {
   const { isAdmin, loading: authLoading } = useAuth();
   const router = useRouter();
 
-  const [tab, setTab] = useState<"users" | "activity">("users");
+  const [tab, setTab] = useState<"users" | "activity" | "agents">("users");
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
   const [loadingData, setLoadingData] = useState(true);
@@ -74,6 +76,13 @@ export function AdminPanel() {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
   const [createSuccess, setCreateSuccess] = useState("");
+  const [agentSettings, setAgentSettings] = useState<AgentAutomationSetting[]>([]);
+  const [execLogs, setExecLogs] = useState<AgentExecutionLog[]>([]);
+  const [agentsLoading, setAgentsLoading] = useState(false);
+  const [otTable, setOtTable] = useState("");
+  const [otRecord, setOtRecord] = useState("");
+  const [otReason, setOtReason] = useState("");
+  const [overrideFeedback, setOverrideFeedback] = useState("");
 
   useEffect(() => {
     if (!authLoading && !isAdmin) router.push("/");
@@ -100,6 +109,67 @@ export function AdminPanel() {
       cancelled = true;
     };
   }, [authLoading, isAdmin]);
+
+  useEffect(() => {
+    if (authLoading || !isAdmin || tab !== "agents") return;
+    setAgentsLoading(true);
+    const sb = createClient();
+    let cancelled = false;
+    void Promise.all([
+      sb.from("agent_automation_settings").select("*").order("label"),
+      sb.from("agent_execution_logs").select("*").order("created_at", { ascending: false }).limit(80),
+    ])
+      .then(([{ data: s }, { data: l }]) => {
+        if (cancelled) return;
+        setAgentSettings((s as AgentAutomationSetting[]) ?? []);
+        setExecLogs((l as AgentExecutionLog[]) ?? []);
+      })
+      .finally(() => {
+        if (!cancelled) setAgentsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, isAdmin, tab]);
+
+  async function toggleAgentEnabled(agentKey: string, enabled: boolean) {
+    const sb = createClient();
+    const { error } = await sb.from("agent_automation_settings").update({ enabled }).eq("agent_key", agentKey);
+    if (error) {
+      window.alert(error.message);
+      return;
+    }
+    setAgentSettings((rows) => rows.map((r) => (r.agent_key === agentKey ? { ...r, enabled } : r)));
+  }
+
+  async function submitAutomationOverride(e: React.FormEvent) {
+    e.preventDefault();
+    setOverrideFeedback("");
+    const table = otTable.trim();
+    const rid = otRecord.trim();
+    if (!table || !rid) {
+      setOverrideFeedback("Indica table_name y record_id (UUID).");
+      return;
+    }
+    const sb = createClient();
+    const { error } = await sb.from("record_automation_overrides").upsert(
+      {
+        table_name: table,
+        record_id: rid,
+        paused: true,
+        reason: otReason.trim() || null,
+      },
+      { onConflict: "table_name,record_id" },
+    );
+    if (error) {
+      setOverrideFeedback(error.message);
+      return;
+    }
+    setOverrideFeedback("Pausa registrada. Los agentes deben consultar esta tabla antes de actuar.");
+    setOtTable("");
+    setOtRecord("");
+    setOtReason("");
+  }
 
   async function updateRole(userId: string, role: string) {
     const sb = createClient();
@@ -155,7 +225,7 @@ export function AdminPanel() {
       </header>
 
       <div className="mb-6 flex gap-2">
-        {(["users", "activity"] as const).map((t) => (
+        {(["users", "activity", "agents"] as const).map((t) => (
           <button
             key={t}
             type="button"
@@ -166,7 +236,7 @@ export function AdminPanel() {
                 : "border border-clinical-line bg-clinical-paper text-clinical-muted hover:bg-vilo-50"
             }`}
           >
-            {t === "users" ? "Team Members" : "Activity Log"}
+            {t === "users" ? "Team Members" : t === "activity" ? "Activity Log" : "Agents"}
           </button>
         ))}
       </div>
@@ -294,7 +364,7 @@ export function AdminPanel() {
               <table className="w-full text-sm">
                 <thead className="bg-clinical-paper">
                   <tr>
-                    {["Name", "Role", "Status", "Actions"].map((h) => (
+                    {["Name", "Role", "Business units", "Status", "Actions"].map((h) => (
                       <th
                         key={h}
                         className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-clinical-muted"
@@ -321,6 +391,9 @@ export function AdminPanel() {
                           ))}
                         </select>
                       </td>
+                      <td className="max-w-[200px] px-4 py-3 text-xs text-clinical-muted">
+                        {(u.allowed_business_units ?? ["vilo_research", "vitalis"]).join(", ")}
+                      </td>
                       <td className="px-4 py-3">
                         <Badge tone={u.active ? "vitalis" : "neutral"}>{u.active ? "Active" : "Inactive"}</Badge>
                       </td>
@@ -339,6 +412,172 @@ export function AdminPanel() {
               </table>
             </CardBody>
           </Card>
+        </div>
+      )}
+
+      {tab === "agents" && (
+        <div className="space-y-6">
+          {agentsLoading ? (
+            <div className="text-sm text-clinical-muted">Loading agents…</div>
+          ) : (
+            <>
+              <Card>
+                <CardHeader>
+                  <div className="text-sm font-semibold text-clinical-ink">Agent automation</div>
+                  <div className="text-xs text-clinical-muted">
+                    Desactiva un agente para que los cron / Edge Functions no ejecuten lógica (p. ej. Triage consulta
+                    esta tabla).
+                  </div>
+                </CardHeader>
+                <CardBody className="p-0">
+                  <table className="w-full text-sm">
+                    <thead className="bg-clinical-paper">
+                      <tr>
+                        {["Agent", "Key", "Enabled"].map((h) => (
+                          <th
+                            key={h}
+                            className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-clinical-muted"
+                          >
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-clinical-line">
+                      {agentSettings.map((a) => (
+                        <tr key={a.agent_key}>
+                          <td className="px-4 py-3 font-medium text-clinical-ink">{a.label}</td>
+                          <td className="px-4 py-3 font-mono text-xs text-clinical-muted">{a.agent_key}</td>
+                          <td className="px-4 py-3">
+                            <button
+                              type="button"
+                              onClick={() => void toggleAgentEnabled(a.agent_key, !a.enabled)}
+                              className={`rounded-lg border px-3 py-1 text-xs font-semibold ${
+                                a.enabled
+                                  ? "border-green-200 bg-green-50 text-green-800"
+                                  : "border-clinical-line bg-clinical-paper text-clinical-muted"
+                              }`}
+                            >
+                              {a.enabled ? "ON" : "OFF"}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </CardBody>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <div className="text-sm font-semibold text-clinical-ink">Manual override (pausar por registro)</div>
+                  <div className="text-xs text-clinical-muted">
+                    Tabla PostgreSQL + UUID de fila. Los agentes deben llamar a{" "}
+                    <code className="rounded bg-clinical-paper px-1">isRecordAutomationPaused</code> antes de efectos
+                    automáticos.
+                  </div>
+                </CardHeader>
+                <CardBody>
+                  <form onSubmit={submitAutomationOverride} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <div>
+                      <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-clinical-muted">
+                        table_name
+                      </label>
+                      <input
+                        value={otTable}
+                        onChange={(e) => setOtTable(e.target.value)}
+                        placeholder="vilo_opportunities"
+                        className="w-full rounded-lg border border-clinical-line bg-clinical-paper px-3 py-2 text-sm text-clinical-ink outline-none focus:border-vilo-400"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-clinical-muted">
+                        record_id
+                      </label>
+                      <input
+                        value={otRecord}
+                        onChange={(e) => setOtRecord(e.target.value)}
+                        placeholder="uuid"
+                        className="w-full rounded-lg border border-clinical-line bg-clinical-paper px-3 py-2 text-sm text-clinical-ink outline-none focus:border-vilo-400"
+                      />
+                    </div>
+                    <div className="sm:col-span-2 lg:col-span-2">
+                      <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-clinical-muted">
+                        Motivo (opcional)
+                      </label>
+                      <input
+                        value={otReason}
+                        onChange={(e) => setOtReason(e.target.value)}
+                        className="w-full rounded-lg border border-clinical-line bg-clinical-paper px-3 py-2 text-sm text-clinical-ink outline-none focus:border-vilo-400"
+                      />
+                    </div>
+                    <div className="sm:col-span-2 lg:col-span-4 flex items-center gap-3">
+                      <button
+                        type="submit"
+                        className="rounded-lg bg-vilo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-vilo-700"
+                      >
+                        Pausar automatización
+                      </button>
+                      {overrideFeedback && (
+                        <span className="text-xs text-clinical-muted">{overrideFeedback}</span>
+                      )}
+                    </div>
+                  </form>
+                </CardBody>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <div className="text-sm font-semibold text-clinical-ink">Execution log (últimas 80)</div>
+                  <div className="text-xs text-clinical-muted">✅ success · ⚠️ retry · ❌ failed</div>
+                </CardHeader>
+                <CardBody className="p-0 max-h-[480px] overflow-y-auto">
+                  <table className="w-full text-sm">
+                    <thead className="sticky top-0 bg-clinical-paper">
+                      <tr>
+                        {["Time", "Agent", "Event", "Status", "ms", "Error"].map((h) => (
+                          <th
+                            key={h}
+                            className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-clinical-muted"
+                          >
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-clinical-line">
+                      {execLogs.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="px-4 py-8 text-center text-clinical-muted">
+                            Sin ejecuciones registradas aún (aplica migración 25 y ejecuta un tick de Triage).
+                          </td>
+                        </tr>
+                      ) : (
+                        execLogs.map((log) => (
+                          <tr key={log.id}>
+                            <td className="whitespace-nowrap px-4 py-2 text-xs text-clinical-muted">
+                              {new Date(log.created_at).toLocaleString()}
+                            </td>
+                            <td className="px-4 py-2 font-mono text-xs text-clinical-ink">{log.agent_name}</td>
+                            <td className="max-w-[140px] truncate px-4 py-2 text-xs text-clinical-muted" title={log.trigger_event}>
+                              {log.trigger_event}
+                            </td>
+                            <td className="px-4 py-2 text-lg leading-none">
+                              {log.status === "success" ? "✅" : log.status === "retry" ? "⚠️" : "❌"}
+                            </td>
+                            <td className="px-4 py-2 font-mono text-xs text-clinical-muted">{log.execution_time_ms}</td>
+                            <td className="max-w-xs truncate px-4 py-2 text-xs text-red-700" title={log.error_message ?? undefined}>
+                              {log.error_message ?? "—"}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </CardBody>
+              </Card>
+            </>
+          )}
         </div>
       )}
 

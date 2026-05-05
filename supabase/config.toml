@@ -1,0 +1,14 @@
+# Supabase CLI — https://supabase.com/docs/guides/cli/config
+# Ej.: `supabase functions deploy notify-due`
+
+[functions.notify-due]
+verify_jwt = false
+
+[functions.backup-daily]
+verify_jwt = false
+
+[functions.nurture-agent]
+verify_jwt = false
+
+[functions.proposal-agent]
+verify_jwt = false

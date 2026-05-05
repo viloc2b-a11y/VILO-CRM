@@ -55,12 +55,16 @@ async function runCron() {
       .eq("archived", false)
       .is("last_contact_date", null)
       .lt("created_at", cutoff24h)
-      .not("current_stage", "in", '("Enrolled","Screen Fail","Nurture / Future Study")'),
+      .not(
+        "current_stage",
+        "in",
+        '("Enrolled","Screen Fail","Patient Lost","Nurture / Future Study")'
+      ),
     serviceClient
       .from("patient_leads")
       .select("id, full_name")
       .eq("archived", false)
-      .eq("current_stage", "Scheduled")
+      .in("current_stage", ["Scheduled", "Visit Confirmed"])
       .lte("last_contact_date", yesterday.toISOString().slice(0, 10)),
     serviceClient
       .from("vilo_opportunities")

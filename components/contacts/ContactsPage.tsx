@@ -8,6 +8,9 @@ import { Modal } from "@/components/ui/Modal";
 import { useCrmStore } from "@/lib/store";
 import { useEffect, useMemo, useState } from "react";
 
+import { OrganizationReportActions } from "@/components/contacts/OrganizationReportActions";
+import Link from "next/link";
+
 type Tab = "organizations" | "contacts";
 
 export function ContactsPage() {
@@ -174,6 +177,13 @@ export function ContactsPage() {
                   Delete
                 </Button>
               </div>
+              <OrganizationReportActions
+                organizationId={o.id}
+                organizationName={o.name}
+                defaultRecipientEmail={
+                  contacts.find((c) => c.organizationId === o.id && c.email?.trim())?.email ?? null
+                }
+              />
             </Card>
           ))}
           {filteredOrgs.length === 0 && (
@@ -202,6 +212,12 @@ export function ContactsPage() {
                   <td className="px-3 py-2 text-xs">{c.email || "—"}</td>
                   <td className="px-3 py-2 text-xs">{c.phone || "—"}</td>
                   <td className="space-x-2 px-3 py-2 text-right">
+                    <Link
+                      href={`/vilo/contacts/${c.id}`}
+                      className="mr-2 inline-block text-xs font-medium text-vilo-700 underline-offset-2 hover:underline"
+                    >
+                      Timeline
+                    </Link>
                     <Button
                       variant="secondary"
                       className="px-2 py-1 text-xs"

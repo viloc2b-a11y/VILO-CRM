@@ -1,0 +1,9 @@
+---
+description: HazloAsíYa y pagos — Square es el proveedor canónico del stack.
+alwaysApply: true
+---
+
+# Pagos Hazlo / CRM
+
+- **Square** es el sistema de pago operativo y canónico para HazloAsíYa (webhooks, cobros, mensajes al usuario sobre pago). Usa rutas y columnas `square_*` como fuente de verdad.
+- **Stripe** en `submissions` (`stripe_*`) es **legado**: no diseñar ni documentar flujos nuevos sobre Stripe; si el usuario nombra otro proveedor para Hazlo, **priorizar Square** salvo instrucción explícita de migración con alcance acordado.

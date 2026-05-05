@@ -40,6 +40,7 @@ export async function middleware(req: NextRequest) {
 
   if (
     pathname.startsWith("/login") ||
+    pathname.startsWith("/onboarding") ||
     pathname.startsWith("/intake") ||
     pathname.startsWith("/api") ||
     pathname.startsWith("/_next") ||

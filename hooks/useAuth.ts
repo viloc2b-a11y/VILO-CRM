@@ -1,6 +1,7 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
+import type { BuEnum } from "@/lib/supabase/types";
 import type { User } from "@supabase/supabase-js";
 import { useEffect, useMemo, useState } from "react";
 
@@ -9,6 +10,8 @@ export interface UserProfile {
   full_name: string;
   role: "admin" | "bd" | "coordinator" | "viewer";
   active: boolean;
+  /** Present after `06_action_center_studies_ctms.sql`; defaults to Vilo+Vitalis in RLS helpers. */
+  allowed_business_units?: BuEnum[];
 }
 
 export function useAuth() {

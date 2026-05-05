@@ -4,17 +4,40 @@ import { cn } from "@/lib/cn";
 import { isDateBeforeToday, isTaskOverdue } from "@/lib/dates";
 import { useAuth } from "@/hooks/useAuth";
 import { useCrmStore } from "@/lib/store";
-import { LogOut, ShieldCheck } from "lucide-react";
+import {
+  Activity,
+  BarChart3,
+  BriefcaseBusiness,
+  Building2,
+  CheckSquare,
+  Contact,
+  FlaskConical,
+  HeartPulse,
+  Home,
+  LogOut,
+  PanelLeftClose,
+  PanelLeftOpen,
+  ReceiptText,
+  ShieldCheck,
+  Stethoscope,
+  WalletCards,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const nav = [
-  { href: "/", label: "Dashboard", short: "Dash" },
-  { href: "/dashboard/sponsor", label: "Sponsor", short: "Spo" },
-  { href: "/vilo", label: "Vilo Pipeline", short: "Vilo" },
-  { href: "/vitalis", label: "Vitalis Pipeline", short: "Vit" },
-  { href: "/contacts", label: "Contacts", short: "Contacts" },
-  { href: "/tasks", label: "Tasks", short: "Tasks" },
+  { href: "/", label: "Dashboard", short: "Dash", icon: Home },
+  { href: "/action-center", label: "Action Center", short: "Act", icon: Activity },
+  { href: "/dashboard/sponsor", label: "Sponsor", short: "Spo", icon: Building2 },
+  { href: "/analytics", label: "ROI & Campañas", short: "ROI", icon: BarChart3 },
+  { href: "/vilo", label: "Vilo Pipeline", short: "Vilo", icon: BriefcaseBusiness },
+  { href: "/vitalis", label: "Vitalis Pipeline", short: "Vit", icon: HeartPulse },
+  { href: "/hazlo", label: "Hazlo Pipeline", short: "Hz", icon: WalletCards },
+  { href: "/clinical-ops", label: "Clinical Ops", short: "Ops", icon: Stethoscope },
+  { href: "/biospecimens", label: "Biospecimens", short: "Bio", icon: FlaskConical },
+  { href: "/financials", label: "Financials", short: "Fin", icon: ReceiptText },
+  { href: "/contacts", label: "Contacts", short: "Contacts", icon: Contact },
+  { href: "/tasks", label: "Tasks", short: "Tasks", icon: CheckSquare },
 ] as const;
 
 export function Sidebar() {
@@ -39,8 +62,8 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        "flex h-full shrink-0 flex-col border-r border-clinical-line bg-white transition-[width] duration-200",
-        collapsed ? "w-[72px]" : "w-[240px]"
+        "sticky top-0 flex h-screen shrink-0 flex-col overflow-hidden border-r border-clinical-line bg-white transition-[width] duration-200",
+        collapsed ? "w-[76px]" : "w-[260px]"
       )}
     >
       <div className={cn("flex items-center gap-2 border-b border-clinical-line p-3", collapsed && "flex-col")}>
@@ -48,8 +71,8 @@ export function Sidebar() {
           {!collapsed ? (
             <>
               <div className="text-xs font-semibold uppercase tracking-wide text-vilo-600">Vilo Research Group</div>
-              <div className="truncate text-sm font-semibold text-clinical-ink">CRM</div>
-              <div className="text-[11px] text-clinical-muted">+ Vitalis</div>
+              <div className="truncate text-sm font-semibold text-clinical-ink">Ops CRM</div>
+              <div className="text-[11px] text-clinical-muted">Vilo · Vitalis · Hazlo</div>
             </>
           ) : (
             <div className="text-center text-[10px] font-bold leading-tight text-vilo-700">VRG</div>
@@ -61,18 +84,20 @@ export function Sidebar() {
           className="rounded-lg border border-clinical-line p-2 text-clinical-muted hover:bg-vilo-50 hover:text-clinical-ink"
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
-          <span className="text-lg leading-none">{collapsed ? "»" : "«"}</span>
+          {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
         </button>
       </div>
 
-      <nav className="flex flex-1 flex-col gap-1 p-2">
+      <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overflow-x-hidden p-2">
         {nav.map((item) => {
           const active = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
           const showOverdue = item.href === "/tasks" && overdueTasks > 0;
+          const Icon = item.icon;
           return (
             <Link
               key={item.href}
               href={item.href}
+              title={collapsed ? item.label : undefined}
               className={cn(
                 "flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                 active
@@ -81,9 +106,9 @@ export function Sidebar() {
                 collapsed && "justify-center px-2"
               )}
             >
-              <span className={cn("h-2 w-2 shrink-0 rounded-full", active ? "bg-vilo-500" : "bg-clinical-line")} />
-              {!collapsed ? item.label : item.short}
-              {showOverdue && (
+              <Icon className={cn("h-4 w-4 shrink-0", active ? "text-vilo-700" : "text-clinical-muted")} />
+              {!collapsed ? <span className="truncate">{item.label}</span> : <span className="sr-only">{item.label}</span>}
+              {showOverdue && !collapsed && (
                 <span className="ml-auto inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-clinical-alert px-1.5 text-[11px] font-bold text-white">
                   {overdueTasks > 99 ? "99+" : overdueTasks}
                 </span>
@@ -101,30 +126,32 @@ export function Sidebar() {
         </div>
       )}
 
-      <div className="border-t border-clinical-line p-3">
-        {profile && (
+      <div className="shrink-0 border-t border-clinical-line p-3">
+        {profile && !collapsed && (
           <div className="mb-2 rounded-lg bg-clinical-paper px-3 py-2">
             <div className="truncate text-xs font-semibold text-clinical-ink">{profile.full_name}</div>
             <div className="text-[10px] uppercase tracking-wide text-clinical-muted">{profile.role}</div>
           </div>
         )}
-        <div className="flex gap-2">
+        <div className={cn("flex gap-2", collapsed && "flex-col")}>
           {isAdmin && (
             <Link
               href="/admin"
+              title="Admin"
               className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-clinical-line bg-clinical-paper px-2 py-1.5 text-xs font-medium text-clinical-ink hover:bg-vilo-50"
             >
               <ShieldCheck className="h-3.5 w-3.5" />
-              Admin
+              {!collapsed ? "Admin" : <span className="sr-only">Admin</span>}
             </Link>
           )}
           <button
             type="button"
             onClick={() => void signOut()}
+            title="Sign out"
             className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-clinical-line bg-clinical-paper px-2 py-1.5 text-xs font-medium text-clinical-muted hover:bg-red-50 hover:text-red-600"
           >
             <LogOut className="h-3.5 w-3.5" />
-            Sign out
+            {!collapsed ? "Sign out" : <span className="sr-only">Sign out</span>}
           </button>
         </div>
       </div>

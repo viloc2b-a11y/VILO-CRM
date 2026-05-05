@@ -1,0 +1,30 @@
+# Cloudflare Pages (Wrangler) — proyecto y variables locales.
+# Secretos reales: Dashboard → Settings → Variables (Encrypted) o `wrangler secret put`.
+# Desarrollo: copiá valores en `.dev.vars` (gitignored); ver docs/CLOUDFLARE_CRONS.md
+#
+# Build / assets estáticos:
+# - En Pages, la carpeta de salida es `pages_build_output_dir` (equivalente al patrón clásico
+#   de Workers `[site] bucket = ".vercel/output/static"`).
+# - Con @opennextjs/cloudflare el adaptador suele fijar la ruta (a veces bajo `.open-next/`);
+#   tras el primer `opennextjs-cloudflare build`, ajustá `pages_build_output_dir` si hace falta.
+# - El comando de build en CI suele definirse en el dashboard de Pages o en el workflow;
+#   localmente: `npm run build` (y el paso del adaptador OpenNext si lo usás).
+# - `compatibility_date` debe ser >= "2024-01-01" para APIs recientes del runtime.
+#
+# Ejemplo estilo Workers (no aplica a este archivo Pages tal cual):
+#   [site]
+#   bucket = ".vercel/output/static"
+#   [build]
+#   command = "npm run build"
+
+name = "viloos-crm"
+compatibility_date = "2024-01-01"
+
+pages_build_output_dir = ".vercel/output/static"
+
+[vars]
+# Vacío en repo: en local definí CRON_SECRET en `.dev.vars` para probar cron con header.
+# Si dejás vacío, las rutas Next no exigen header (mismo criterio que sin CRON_SECRET en Node).
+CRON_SECRET = ""
+
+# Supabase, Square, RESEND, etc. → Dashboard del proyecto Pages (no duplicar secretos aquí).

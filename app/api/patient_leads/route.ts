@@ -1,54 +1,34 @@
+import { applyVitalisIntake, enrichVitalisIntakeFromRawBody, type VitalisIntakePayload } from "@/lib/vitalis/intake";
 import { NextRequest, NextResponse } from "next/server";
-import { serviceClient } from "@/lib/supabase/service-role";
 
+/** Formulario web / integraciones legacy: misma lógica que POST /api/vitalis/intake (sin secret). */
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const {
-      full_name,
-      phone,
-      age_range,
-      condition_or_study_interest,
-      zip_code,
-      preferred_language,
-      source_campaign,
-      source_channel,
-    } = body;
-
-    if (!full_name?.trim() || !phone?.trim()) {
-      return NextResponse.json({ error: "full_name and phone are required" }, { status: 422 });
-    }
-
-    const { data: lead, error: insertError } = await serviceClient
-      .from("patient_leads")
-      .insert({
-        full_name: full_name.trim(),
-        phone: phone.trim(),
-        email: body.email?.trim() || null,
-        preferred_language: preferred_language ?? "Spanish",
-        age_range: age_range || null,
-        gender: null,
-        condition_or_study_interest: condition_or_study_interest?.trim() || null,
-        source_campaign: source_campaign?.trim() || null,
-        zip_code: zip_code?.trim() || null,
-        preferred_contact_channel: "WhatsApp",
-        current_stage: "New Lead",
-        next_action: "Initial contact via WhatsApp",
-        screen_fail_reason: null,
-        last_contact_date: new Date().toISOString().slice(0, 10),
-        notes: source_channel ? `Source: ${source_channel}` : null,
-        archived: false,
-      })
-      .select("id")
-      .single();
-
-    if (insertError) {
-      console.error("[patient_leads insert]", insertError);
-      return NextResponse.json({ error: insertError.message }, { status: 500 });
-    }
-
-    return NextResponse.json({ success: true, lead_id: lead.id }, { status: 201 });
-  } catch {
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    const body = (await req.json()) as Record<string, unknown>;
+    const mapped: VitalisIntakePayload = {
+      full_name: String(body.full_name ?? ""),
+      phone: String(body.phone ?? ""),
+      email: (body.email as string | null | undefined) ?? null,
+      preferred_language: (body.preferred_language as string | null | undefined) ?? "Spanish",
+      age_range: (body.age_range as string | null | undefined) ?? null,
+      gender: (body.gender as string | null | undefined) ?? null,
+      condition_or_study_interest: (body.condition_or_study_interest as string | null | undefined) ?? null,
+      zip_code: (body.zip_code as string | null | undefined) ?? null,
+      preferred_contact_channel: (body.preferred_contact_channel as string | null | undefined) ?? "WhatsApp",
+      source_channel: (body.source_channel as string | null | undefined) ?? "web_form",
+      source_campaign: typeof body.source_campaign === "string" ? body.source_campaign : null,
+      utm: (body.utm as VitalisIntakePayload["utm"]) ?? null,
+      referral_code: (body.referral_code as string | null | undefined) ?? null,
+      consent_to_contact: body.consent_to_contact === true,
+    };
+    const result = await applyVitalisIntake(enrichVitalisIntakeFromRawBody(mapped, body));
+    return NextResponse.json(
+      { success: true, lead_id: result.lead_id, duplicate: result.duplicate },
+      { status: result.duplicate ? 200 : 201 },
+    );
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Server error";
+    const status = msg.includes("required") ? 422 : 500;
+    return NextResponse.json({ error: msg }, { status });
   }
 }
