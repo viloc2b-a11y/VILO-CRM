@@ -146,10 +146,28 @@ export function SponsorDashboard() {
   const pipelineMax = useMemo(() => Math.max(1, ...(dash?.pipeline ?? []).map((p) => p.count)), [dash?.pipeline]);
 
   const copyText = async (text: string) => {
+    if (!text) return;
     try {
-      await navigator.clipboard.writeText(text);
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        return;
+      }
     } catch {
-      window.prompt("Copy:", text);
+      // Some embedded browsers deny clipboard writes even after a user click.
+    }
+
+    try {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.setAttribute("readonly", "");
+      textarea.style.position = "fixed";
+      textarea.style.left = "-9999px";
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+    } catch {
+      window.alert("No se pudo copiar automáticamente. Selecciona el texto manualmente.");
     }
   };
 

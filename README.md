@@ -1,173 +1,365 @@
-# VILO CRM
+# VILO CRM Operativo
 
-Operational CRM for **Vilo Research Group** (B2B pipeline) and **Vitalis** (B2C patient leads). Single Next.js app with two pipelines, tasks, contacts, sponsor analytics, **Supabase Auth** (login + roles), an admin panel, and a public intake endpoint.
+CRM interno para operar tres líneas de negocio desde una sola consola:
 
-**Repository:** [github.com/viloc2b-a11y/VILO-CRM](https://github.com/viloc2b-a11y/VILO-CRM)
+- **Vilo Research**: pipeline B2B para sponsors, CROs, oportunidades, contactos y reportes.
+- **Vitalis**: pipeline B2C de pacientes, leads, prescreen, scheduling y seguimiento.
+- **HazloAsíYa**: pipeline de consumidores, submissions, pagos Square, validación documental y recovery.
+
+La filosofía del producto es simple: **menos dashboards decorativos, más ejecución diaria**. La vista principal es el **Action Center**, una cola única de trabajo que prioriza tareas vencidas, leads calientes, pagos fallidos y oportunidades sin movimiento.
+
+Repositorio: <https://github.com/viloc2b-a11y/VILO-CRM>
+
+---
 
 ## Stack
 
-- **Next.js 15** (App Router), React 19, TypeScript, Tailwind CSS
-- **Supabase** — Postgres for CRM entities and sponsor views; [`@supabase/ssr`](https://supabase.com/docs/guides/auth/server-side/nextjs) for browser/server clients, [`@supabase/supabase-js`](https://supabase.com/docs/reference/javascript/introduction) for the server-only service client
-- **Zustand** — UI and client cache; **`localStorage`** only for `sidebarCollapsed` (CRM rows are loaded from Supabase, not persisted in the browser)
-- **[`lucide-react`](https://lucide.dev/)** — Icons (e.g. [`components/dashboard/Dashboard.tsx`](./components/dashboard/Dashboard.tsx) Documents section)
-- **Auth** — [`middleware.ts`](./middleware.ts) protects app routes; [`app/login/page.tsx`](./app/login/page.tsx); profiles and activity log in [`supabase/05_auth_rbac_activity.sql`](./supabase/05_auth_rbac_activity.sql) (run in Supabase after `01`–`03`)
+- **Frontend**: Next.js App Router, React, TypeScript, Tailwind CSS, Lucide Icons.
+- **Backend**: Supabase Postgres + Auth + Row Level Security.
+- **Datos**: tablas operativas, vistas SQL, triggers, RPCs y migraciones en `supabase/`.
+- **Automatización**: agentes internos para orchestration, triage, recovery, growth, intake y notificaciones.
+- **Pagos HazloAsíYa**: **Square es el sistema canónico**. Stripe queda solo como legado si existen columnas antiguas.
 
-## Environment
+---
 
-Copy [`.env.example`](./.env.example) to `.env.local` and fill in:
+## Cómo Funciona
 
-| Variable | Where it runs | Purpose |
-|----------|----------------|---------|
-| `NEXT_PUBLIC_SUPABASE_URL` | Client + server | Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Client + server | Anon key (RLS applies) |
-| `SUPABASE_SERVICE_ROLE_KEY` | **Server only** — API routes | Bypasses RLS for dashboard, reports, cron, `patient_leads` POST; never expose to the browser |
-| `CRON_SECRET` | Server | Optional. If set, `POST`/`GET` [`/api/cron/check-automations`](./app/api/cron/check-automations/route.ts) requires `Authorization: Bearer <secret>` or `x-cron-secret: <secret>` |
+El CRM se organiza alrededor de cuatro capas:
 
-## Development
+1. **Captura de datos**
+   - Leads Vitalis entran por formularios, intake, WhatsApp o API.
+   - Oportunidades Vilo entran por carga manual, intake B2B o enriquecimiento.
+   - Submissions HazloAsíYa entran desde el funnel público y se actualizan con eventos de pago.
+
+2. **Normalización en Supabase**
+   - Cada línea de negocio tiene tablas propias.
+   - `action_items` funciona como cola operativa global.
+   - RLS limita qué usuarios ven cada unidad de negocio.
+
+3. **Agentes operativos**
+   - **Orchestrator** crea tareas cuando cambia un estado importante.
+   - **Triage** calcula prioridad por urgencia, valor USD y antigüedad.
+   - **Recovery** atiende pagos fallidos.
+   - **Growth** detecta oportunidades de upsell.
+   - **Cadence / Scheduler** dispara seguimientos Vitalis y Vilo.
+
+4. **Ejecución en UI**
+   - El usuario entra al Action Center.
+   - Filtra por unidad, prioridad, estado o búsqueda.
+   - Completa, pospone, reasigna o escala tareas.
+   - Cada módulo conserva su pipeline propio para contexto.
+
+---
+
+## Módulos Principales
+
+| Ruta | Uso |
+|---|---|
+| `/action-center` | Cola global de ejecución. Prioridad máxima del sistema. |
+| `/vilo` | Pipeline B2B de oportunidades Vilo Research. |
+| `/vilo/pipeline` | Kanban comercial por etapa. |
+| `/vilo/contacts/[id]` | Ficha y timeline de comunicaciones B2B. |
+| `/vitalis` | Pipeline de leads/pacientes Vitalis. |
+| `/vitalis/patients/[id]` | Ficha de paciente y seguimiento. |
+| `/hazlo` | Pipeline HazloAsíYa de submissions y pagos. |
+| `/hazlo/review` | Cola de revisión manual. |
+| `/hazlo/submissions/[id]` | Ficha completa del expediente. |
+| `/clinical-ops` | Estudios, sitios, visitas y pagos clínicos. |
+| `/biospecimens` | Specimens, shipments y cadena de custodia. |
+| `/financials` | Invoices, revenue leakage y pagos abiertos. |
+| `/analytics` | ROI y campañas. |
+| `/contacts` | Organizaciones y contactos. |
+| `/tasks` | Tareas operativas. |
+| `/admin` | Usuarios, roles, business units y agentes. |
+
+---
+
+## Administración de Datos en el CRM
+
+### 1. Usuarios y Acceso
+
+Los usuarios se administran desde Supabase Auth y la tabla `user_profiles`.
+
+Campos clave:
+
+- `role`: rol operativo, por ejemplo `admin`, `manager`, `coordinator`.
+- `allowed_business_units`: unidades permitidas, por ejemplo `vilo_research`, `vitalis`, `hazloasiya`.
+- RLS usa estos campos para controlar lectura/escritura.
+
+Un usuario admin puede:
+
+- Crear usuarios desde `/admin`.
+- Asignar business units.
+- Revisar actividad.
+- Activar o pausar agentes.
+
+### 2. Datos B2B Vilo Research
+
+Tablas principales:
+
+- `organizations`
+- `contacts`
+- `vilo_opportunities`
+- `communications_log`
+- `studies`
+- `study_sites`
+- `study_payments`
+
+Uso operativo:
+
+- Registrar sponsors/CROs.
+- Crear oportunidades.
+- Avanzar etapas comerciales.
+- Registrar llamadas, emails y notas.
+- Generar reportes sponsor.
+- Crear tareas automáticas si una oportunidad queda sin movimiento.
+
+### 3. Datos Vitalis
+
+Tablas principales:
+
+- `patient_leads`
+- `patient_visits`
+- `communications_log`
+- tablas de qualifier/scheduler según migraciones aplicadas.
+
+Uso operativo:
+
+- Capturar lead.
+- Contactar rápido.
+- Prescreen.
+- Agendar visita.
+- Confirmar/no-show/enrolled.
+- Crear tareas por leads sin contactar o cambios de etapa.
+
+La UI está preparada para operar aunque falten columnas opcionales en Supabase: muestra datos core y avisa qué migración falta.
+
+### 4. Datos HazloAsíYa
+
+Tablas principales:
+
+- `submissions`
+- `webhook_events`
+- `communications_log`
+- vistas de métricas Hazlo.
+
+Uso operativo:
+
+- Ver expedientes recientes.
+- Detectar pagos fallidos.
+- Revisar validación documental.
+- Gestionar recuperación de pago.
+- Activar growth/upsell tras entrega.
+
+**Square** es la fuente canónica para cobros. El webhook principal es:
+
+```txt
+POST /api/hazlo/square/webhook
+```
+
+El sistema valida firma, registra idempotencia y actualiza `submissions`.
+
+### 5. Action Center
+
+Tabla central:
+
+- `action_items`
+
+Campos clave:
+
+- `business_unit`
+- `record_type`
+- `record_id`
+- `title`
+- `status`
+- `priority`
+- `due_date`
+- `value_usd`
+- `assigned_to`
+- `source`
+
+El Action Center agrupa:
+
+- tareas vencidas y de hoy;
+- leads Vitalis sin contactar;
+- pagos fallidos HazloAsíYa;
+- oportunidades Vilo sin movimiento;
+- otras acciones abiertas.
+
+---
+
+## Seguridad y Compliance
+
+Este proyecto está diseñado con base para operación sensible, incluyendo contexto clínico.
+
+Medidas incluidas:
+
+- Supabase Auth.
+- Row Level Security.
+- Service role solo en rutas servidor.
+- Separación por business unit.
+- Logs de actividad.
+- Logs de ejecución de agentes.
+- Variables sensibles fuera del cliente.
+- Preparación para cifrado de campos sensibles.
+
+Importante:
+
+- No subir `.env.local`.
+- No exponer `SUPABASE_SERVICE_ROLE_KEY`.
+- No guardar PHI/PII en logs de consola.
+- Usar RLS antes de producción.
+- Ejecutar migraciones completas antes de operar datos reales.
+
+---
+
+## Migraciones Supabase
+
+Los SQL viven en `supabase/` y deben aplicarse en orden numérico.
+
+Ejemplos de bloques:
+
+- `06` a `10`: Action Center y métricas.
+- `17` a `19`: Vitalis intake, qualifier y scheduler.
+- `20` a `22`: Hazlo submissions, recovery y growth.
+- `23` a `25`: Orchestrator, triage y agent control.
+- `39` a `42`: communications log por entidad.
+- `43` y `44`: esquema operativo CRM y clinical ops extendido.
+
+Guía principal:
+
+```txt
+supabase/INTEGRATION.md
+```
+
+Si una tabla o vista falta, la UI muestra “modo estructura” para no romper el dashboard mientras se completa la base.
+
+---
+
+## Variables de Entorno
+
+Copiar:
+
+```bash
+cp .env.example .env.local
+```
+
+Variables mínimas:
+
+```txt
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+CRON_SECRET=
+```
+
+Variables según módulos:
+
+```txt
+SQUARE_WEBHOOK_SIGNATURE_KEY=
+SQUARE_WEBHOOK_NOTIFICATION_URL=
+SQUARE_ACCESS_TOKEN=
+RESEND_API_KEY=
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+WHATSAPP_ACCESS_TOKEN=
+OPENAI_API_KEY=
+```
+
+Ver `.env.example` para la lista completa.
+
+---
+
+## Desarrollo Local
+
+Instalar:
 
 ```bash
 npm install
+```
+
+Ejecutar:
+
+```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Abrir:
+
+```txt
+http://localhost:3000
+```
+
+Validar antes de subir:
 
 ```bash
-npm run lint
 npm run build
-npm start
+npx tsc --noEmit
 ```
 
-## Routes (App)
-
-| Path | Description |
-|------|-------------|
-| `/login` | Sign in (email/password); unauthenticated users are redirected here |
-| `/` | Home — operational **Dashboard** (requires auth; Vilo / Vitalis metrics, pending tasks, **Documents** card with links under `/docs/…`) |
-| `/admin` | **Admin only** — team members, roles, activity log (`user_profiles` + `activity_log`); pestaña **Agents** (migración 25) |
-| `/action-center` | Action Center — `action_items`, métricas, panel de agentes (admins) |
-| `/vilo` | B2B opportunity pipeline |
-| `/vilo/pipeline` | Kanban “abierto” (sin Activated / Closed Lost / Nurture en el fetch inicial) |
-| `/vilo/contacts/[id]` | Timeline de `communications_log` para el contacto (enlace **Timeline** en `/contacts`) |
-| `/vitalis` | B2C patient leads (pipeline + ficha `/vitalis/patients/[id]`); deploy, cron Cloudflare y plantillas WhatsApp: [`docs/VITALIS_B2C_DEPLOY_CHECKLIST.md`](./docs/VITALIS_B2C_DEPLOY_CHECKLIST.md) |
-| `/hazlo` | HazloAsíYa — pipeline de `submissions` + métricas (`v_hazlo_metrics`) |
-| `/analytics` | ROI / CAC por campaña (`v_campaign_roi_metrics`); checklist: [`docs/ANALYTICS_DEPLOY_CHECKLIST.md`](./docs/ANALYTICS_DEPLOY_CHECKLIST.md) |
-| `/contacts` | Organizations + contacts (Vilo) |
-| `/tasks` | Task list |
-| `/intake` | Lead capture (posts to API) |
-| `/dashboard/sponsor` | Sponsor metrics (fetches `/api/dashboard` + `/api/reports/sponsor`, refreshes every 60s) |
-
-## API routes
-
-Server handlers use **`serviceClient`** from [`lib/supabase/service-role.ts`](./lib/supabase/service-role.ts) (not the anon key in the browser).
-
-| Route | Role |
-|-------|------|
-| `POST /api/patient_leads` | Public intake → inserts `patient_leads` (follow-up task is created by DB trigger `trg_new_lead_task`, not duplicated in this route) |
-| `GET /api/dashboard` | Sponsor panel: enrollment / execution views + pipeline + tasks + screen fails |
-| `GET /api/reports/sponsor` | Weekly sponsor report + sources + screen-fail snippet + bilingual `sponsor_message` |
-| `GET /api/reports/sponsor/pdf` | PDF auto-generado para sponsors/CROs ([`docs/SPONSOR_REPORT_PDF.md`](./docs/SPONSOR_REPORT_PDF.md)) |
-| `PATCH /api/tasks/[id]` | Toggle `done` on a task row |
-| `POST` / `GET /api/cron/check-automations` | Automation checks (Vercel cron; see [`vercel.json`](./vercel.json)) |
-| `POST` / `GET /api/vilo/outreach-cadence/tick` | Cadencia B2B (Resend + `action_items`); `x-cron-secret` si `CRON_SECRET` está definido — Cloudflare: [`docs/CLOUDFLARE_CRONS.md`](./docs/CLOUDFLARE_CRONS.md) |
-| `POST /api/vilo/intake-b2b` | Ingesta B2B (`ingestB2BLead`); `x-vilo-api-secret` si `VILO_API_SECRET` está definido — checklist: [`docs/B2B_VILO_DEPLOY_CHECKLIST.md`](./docs/B2B_VILO_DEPLOY_CHECKLIST.md) |
-| `POST /api/vilo/email-tracking` | Webhook Resend (opens/clicks → `communications_log` + tarea engagement); `RESEND_WEBHOOK_SECRET` + header `x-resend-secret` o `x-webhook-secret` |
-| `GET /api/vilo/contacts/[id]/communications` | JSON: últimos 50 `communications_log` del contacto (sesión Supabase + RLS) |
-| `POST /api/vilo/communications/log` | Insert manual en `communications_log` (Quick-Log; body: `contactId`, `orgId` / `companyId`, `opportunityId` / `oppId`, `channel`, `type`, `body`, `direction`) |
-| `POST /api/vitalis/b2c-intake` | Ingesta B2C (`ingestB2CLead`); header `x-intake-secret` si `INTAKE_WEBHOOK_SECRET` — [`docs/VITALIS_B2C_DEPLOY_CHECKLIST.md`](./docs/VITALIS_B2C_DEPLOY_CHECKLIST.md) |
-| `POST` / `GET /api/vitalis/cadence/tick` | Cadencia B2C Vitalis (WhatsApp/email + tareas); `x-cron-secret` si `CRON_SECRET` |
-| `POST /api/vitalis/communications/log` | Quick-Log paciente → `communications_log.patient_lead_id` (sesión + RLS Vitalis; requiere SQL `41`) |
-| `POST /api/activity` | Authenticated CRM actions → `activity_log` (used by the store; non-fatal errors still return 200) |
-| `POST /api/admin/create-user` | **Admin only** — creates Auth user + profile (service role) |
-
-Checklists deploy: [`docs/B2B_VILO_DEPLOY_CHECKLIST.md`](./docs/B2B_VILO_DEPLOY_CHECKLIST.md) (ingesta + pipeline + cadencia), [`docs/VITALIS_B2C_DEPLOY_CHECKLIST.md`](./docs/VITALIS_B2C_DEPLOY_CHECKLIST.md) (Vitalis B2C: SQL, intake, cadencia, WhatsApp, Cloudflare), [`docs/COMMUNICATIONS_TRACKING_DEPLOY_CHECKLIST.md`](./docs/COMMUNICATIONS_TRACKING_DEPLOY_CHECKLIST.md) (`communications_log`, Resend, Quick-Log), [`docs/CLOUDFLARE_CRONS.md`](./docs/CLOUDFLARE_CRONS.md).
-
-## Flujo HazloAsíYa (Square → webhooks → agentes)
-
-Resumen alineado al código actual (`app/api/hazlo/`, `lib/hazlo/`, triggers en `supabase/20_*` y `22_*`):
-
-1. El usuario paga en el funnel (sitio Hazlo) → **Square** procesa el cobro.
-2. Square envía **`POST`** a [`/api/hazlo/square/webhook`](./app/api/hazlo/square/webhook/route.ts) con eventos típicamente **`payment.created`** / **`payment.updated`**. Los rechazos suelen llegar como **`payment.updated`** con `payment.status` **FAILED** / **CANCELED**, no como un tipo `payment.failed` separado en el catálogo.
-3. El handler valida la firma (**`x-square-hmacsha256-signature`**, `SQUARE_WEBHOOK_NOTIFICATION_URL` + cuerpo) y la **idempotencia** (`webhook_events` vía `register_webhook_event`).
-4. **Pago fallido:** se actualiza `submissions` (`payment_status`, `payment_recovery_state`, etc.); puede enviarse correo D0 de recovery; el trigger **`trg_submissions_action_center`** sincroniza **`action_items`** con siguiente paso del estilo **«Resolver fallo de pago»** (y título de trámite). Casos **fraud_block** pueden crear una tarea de soporte adicional desde código.
-5. **Pago completado** (`COMPLETED`): se marca **`paid`** / **`Paid`**; el trigger genera la tarea con **«Entregar PDF + upsell (pago confirmado)»**. El **Growth Agent (+7 días)** opera cuando el expediente está en **`PDF delivered`** con **`pdf_delivered_at`** poblado (la entrega del PDF puede ser un paso posterior al webhook de pago, según tu operación).
-6. **Recovery Agent** — cron [`/api/hazlo/recovery/tick`](./app/api/hazlo/recovery/tick/route.ts) (programá frecuencia en Vercel u otro): secuencia por días (email, WhatsApp, llamada, etc.) según `lib/hazlo/recovery/run.ts`.
-7. **Growth Agent** — cron [`/api/hazlo/growth/tick`](./app/api/hazlo/growth/tick/route.ts): ofertas complementarias para filas con PDF entregado hace **≥7 días**; la periodicidad del cron es la que configures (**diaria**, semanal, etc.).
-8. **Action Center** — todas las tareas **`action_items`** con filtros por UE (p. ej. `?bu=hazloasiya`).
-9. **WhatsApp (Meta)** — Recovery día 2 y Growth pueden usar plantillas Cloud API: [`docs/WHATSAPP_HAZLO_AGENTS.md`](./docs/WHATSAPP_HAZLO_AGENTS.md).
-9. **UI `/hazlo`** — vista dedicada del pipeline; implementación en `app/(dashboard)/hazlo/page.tsx`.
-
-Detalle de webhooks y variables: [`app/api/hazlo/README.md`](./app/api/hazlo/README.md) y [`.env.example`](./.env.example).
-
-## Project layout
-
-| Path | Purpose |
-|------|---------|
-| `app/` | App Router pages + `app/api/*` |
-| `components/` | UI, pipelines, [`dashboard/Dashboard.tsx`](./components/dashboard/Dashboard.tsx), sponsor dashboard, forms |
-| `public/docs/` | **Optional.** Static `.docx` / `.pdf` files served at `/docs/<filename>` (create the folder and add files; links on the Dashboard open in a new tab) |
-| `lib/store.ts` | Zustand store + async loaders/mutations calling `lib/db/*` |
-| `lib/db/` | Thin modules: `vilo`, `vitalis`, `tasks`, `contacts`, `organizations`, `dashboard` (Supabase reads/writes) |
-| `lib/supabase/` | `client.ts` (browser), `server.ts` (cookies), `service-role.ts`, mappers, types |
-| `supabase/` | … **`08`–`10`** (`10` = `v_action_metrics`) |
-
-## Database
-
-Apply the SQL files **in order** in the [Supabase SQL editor](https://supabase.com/dashboard): ver orden completo en [`supabase/INTEGRATION.md`](./supabase/INTEGRATION.md) (**`01` … `25`** según necesites orchestrator, triage, agent control, Hazlo, Vitalis, etc.). Mínimo histórico: **`01` → `02` → `03` → `05` → `06` → `07` → `08`**. The Action Center reads **`v_action_center`** / **`action_items`**; **`08`** sincroniza etapas desde Vilo/Vitalis. Without **`05`**, login and `user_profiles` / `activity_log` will not match the app. After the first deploy, promote one user to `admin` in `user_profiles` (see [`supabase/INTEGRATION.md`](./supabase/INTEGRATION.md)).
-
-More detail: [`supabase/INTEGRATION.md`](./supabase/INTEGRATION.md). Generated / hand-maintained table typings: [`lib/supabase/types.ts`](./lib/supabase/types.ts).
-
-## Deploy en 3 pasos
-
-### 1. Supabase
-
-En el [SQL Editor](https://supabase.com/dashboard) del proyecto, ejecuta los scripts **en orden numérico** según [`supabase/INTEGRATION.md`](./supabase/INTEGRATION.md): desde **`01_schema.sql`** hasta **`25_agent_control.sql`** (y Edge Functions opcionales en `supabase/functions/`).
-
-- El archivo [`supabase/migrations/001_viloos_schema.sql`](./supabase/migrations/001_viloos_schema.sql) es solo **referencia** para el árbol `migrations/`; **no** sustituye al resto. Tras aplicar los scripts, en **Database → Tables** deben existir, entre otras, `action_items`, `user_profiles`, `vilo_opportunities`, `patient_leads`, `agent_execution_logs` (tras la 25).
-
-### 2. Next.js
-
-```bash
-npm install
-cp .env.example .env.local   # completar variables (ver tabla «Environment» arriba)
-npm run build
-```
-
-Dependencias ya previstas en el repo: `date-fns`, `zod`, `@supabase/supabase-js`, `@supabase/ssr`. Rutas relevantes del Action Center / agentes: [`app/action-center/`](./app/action-center/), [`app/api/action-center/`](./app/api/action-center/), [`lib/agents/`](./lib/agents/).
-
-### 3. Vercel
-
-```bash
-vercel --prod
-```
-
-Configura en el proyecto Vercel (Settings → Environment Variables), como mínimo:
-
-| Variable | Entorno | Notas |
-|----------|---------|--------|
-| `NEXT_PUBLIC_SUPABASE_URL` | Production / Preview | URL del proyecto Supabase |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Production / Preview | Clave anónima (RLS activo en cliente) |
-| `SUPABASE_SERVICE_ROLE_KEY` | Production / Preview | **Solo uso servidor** (API routes, cron, `serviceClient`); nunca en el bundle del cliente |
-| `CRON_SECRET` | Production | Recomendado: ticks bajo [`app/api/action-center/*/tick`](./app/api/action-center/) y otros cron exigen `x-cron-secret` si está definido |
-
-Añade también las variables que uses (p. ej. Stripe, Resend, Twilio) según [`/.env.example`](./.env.example).
-
-[`vercel.json`](./vercel.json) puede programar llamadas a cron; alinea el secreto con el header configurado.
-
-**Cloudflare Pages:** los crons no van en `vercel.json`; variables y secretos en el Dashboard (**Encrypt**), no `.env.local` en producción. Guía: [`docs/CLOUDFLARE_CRONS.md`](./docs/CLOUDFLARE_CRONS.md) (**PASO 5** + crons). Vitalis B2C (plantillas WhatsApp, env, checklist): [`docs/VITALIS_B2C_DEPLOY_CHECKLIST.md`](./docs/VITALIS_B2C_DEPLOY_CHECKLIST.md).
+Nota: después de `npm run build`, si el servidor dev estaba vivo, reiniciarlo para evitar bundles mezclados de Next.
 
 ---
 
-## Notas de producción
+## Despliegue
 
-- **Idempotencia:** Las tareas del Action Center son filas en **`action_items`**, no una tabla `tasks` genérica. El orchestrator en SQL (`23_orchestrator_agent.sql`) y el handler TS [`handleStateChange`](./lib/agents/state-change.ts) evitan duplicados comprobando `source` + `record_id` (y estados abiertos) antes de insertar.
-- **RLS:** Políticas por **`business_unit`** y `user_profiles.allowed_business_units`; los agentes que escriben con **`SUPABASE_SERVICE_ROLE_KEY`** bypass RLS solo en rutas servidor.
-- **Auditoría:** **`activity_log`** (acciones de usuario) y **`agent_execution_logs`** (migración **25**). No hay `audit_logs` ni trigger masivo estilo 21 CFR Part 11 en todas las tablas; para trazabilidad completa habría que extender triggers o usar Edge Functions con registro explícito.
-- **Webhooks / agentes:** Las funciones en `lib/agents/` están pensadas para invocarse desde API routes o una **Supabase Edge Function** que, tras validar el payload, llame a [`handleStateChange`](./lib/agents/state-change.ts) u otros ticks con reintentos idempotentes.
+1. Aplicar migraciones en Supabase.
+2. Configurar variables de entorno.
+3. Verificar RLS y usuarios admin.
+4. Ejecutar build.
+5. Desplegar en Vercel o la plataforma configurada.
+6. Configurar crons para agentes.
+7. Configurar webhooks externos.
+
+Crons recomendados:
+
+- `/api/action-center/orchestrator/tick`
+- `/api/action-center/triage/tick`
+- `/api/hazlo/recovery/tick`
+- `/api/hazlo/growth/tick`
+- `/api/hazlo/validator/tick`
+- `/api/vitalis/cadence/tick`
+- `/api/vilo/outreach-cadence/tick`
 
 ---
 
-## Deployment — resumen cron
+## Operación Diaria
 
-- **Vercel:** [`vercel.json`](./vercel.json) programa `/api/cron/check-automations` (y podés añadir más paths ahí). Usá `CRON_SECRET` / `x-cron-secret` para restringir el acceso.
-- **Cloudflare:** Cron Triggers en el Dashboard; ver [`docs/CLOUDFLARE_CRONS.md`](./docs/CLOUDFLARE_CRONS.md) (Hazlo validator/recovery/growth, **cadencia Vitalis B2C** `/api/vitalis/cadence/tick`, variables). Checklist Vitalis: [`docs/VITALIS_B2C_DEPLOY_CHECKLIST.md`](./docs/VITALIS_B2C_DEPLOY_CHECKLIST.md).
+Rutina recomendada:
+
+1. Abrir `/action-center`.
+2. Resolver primero críticas y vencidas.
+3. Revisar Vitalis leads nuevos.
+4. Revisar pagos fallidos Hazlo.
+5. Revisar Vilo oportunidades sin movimiento.
+6. Reasignar tareas por carga.
+7. Cerrar tareas completadas.
+8. Revisar `/admin` para agentes y logs si algo no corre.
+
+---
+
+## Estado del Proyecto
+
+Implementado:
+
+- CRM multibusiness unit.
+- Action Center.
+- Pipelines Vilo, Vitalis y Hazlo.
+- Clinical Ops.
+- Biospecimens.
+- Financials.
+- Analytics.
+- Admin panel.
+- Agentes MVP.
+- Migraciones Supabase.
+- Compatibilidad con esquemas incompletos durante setup.
+
+Pendiente antes de producción estricta:
+
+- Confirmar migraciones en Supabase real.
+- Revisar RLS con usuarios reales.
+- Activar webhooks Square.
+- Configurar crons.
+- Validar flujos con datos reales.
+- Extender auditoría si se requiere trazabilidad tipo 21 CFR Part 11.
+
