@@ -340,6 +340,28 @@ Rutina recomendada:
 
 ## Estado del Proyecto
 
+Último rechequeo local: **2026-05-06**.
+
+Validado:
+
+- `npm run build` pasa con build limpio.
+- `npx tsc --noEmit` pasa.
+- Las rutas principales cargan sin runtime crash:
+  - `/`
+  - `/action-center`
+  - `/vilo`
+  - `/vilo/pipeline`
+  - `/vitalis`
+  - `/hazlo`
+  - `/clinical-ops`
+  - `/biospecimens`
+  - `/financials`
+  - `/analytics`
+  - `/contacts`
+  - `/tasks`
+  - `/admin`
+  - `/dashboard/sponsor`
+
 Implementado:
 
 - CRM multibusiness unit.
@@ -354,12 +376,36 @@ Implementado:
 - Migraciones Supabase.
 - Compatibilidad con esquemas incompletos durante setup.
 
-Pendiente antes de producción estricta:
+Funciona con administración manual:
+
+- `/contacts`: `Quick add`, `Rename`, `Delete`, `Timeline`.
+- `/tasks`: `Quick add`, `Add task`.
+- `/action-center`: `Asignar a...`, `Completar`, `+1d`.
+- `/clinical-ops`: crear estudios, sitios, visitas y pagos clínicos.
+- `/biospecimens`: crear specimens/shipments y actualizar status.
+- `/financials`: crear invoices y actualizar status.
+- `/admin`: crear usuarios, revisar roles/agentes.
+- `/vilo`: crear oportunidades desde el pipeline.
+
+Funciona en modo estructura mientras faltan migraciones/datos:
+
+- `/action-center`: carga, pero necesita `action_items` y `v_action_metrics` para operar con datos reales.
+- `/vitalis`: carga con datos core si faltan columnas opcionales.
+- `/hazlo`: carga, pero necesita `submissions` para expedientes reales.
+- `/analytics`: necesita `v_campaign_roi_metrics`.
+
+Eslabones pendientes antes de producción estricta:
 
 - Confirmar migraciones en Supabase real.
+- Aplicar/validar `action_items`.
+- Aplicar/validar `v_action_metrics`.
+- Aplicar/validar `submissions`.
+- Aplicar/validar `v_hazlo_metrics`.
+- Aplicar/validar `v_campaign_roi_metrics`.
+- Completar columnas opcionales Vitalis como `last_contact_channel` y `assigned_navigator`.
 - Revisar RLS con usuarios reales.
 - Activar webhooks Square.
 - Configurar crons.
+- Añadir en `vercel.json` o Cloudflare los ticks de orchestrator, triage, Hazlo recovery/growth/validator, Vitalis cadence y Vilo outreach.
 - Validar flujos con datos reales.
 - Extender auditoría si se requiere trazabilidad tipo 21 CFR Part 11.
-
