@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: light;
+  color-scheme: dark;
 }
 
 html,
@@ -13,4 +13,139 @@ body {
 
 body {
   @apply bg-clinical-paper text-clinical-ink antialiased;
+}
+
+@layer base {
+  ::selection {
+    background: rgba(56, 189, 248, 0.35);
+    color: #e2e8f0;
+  }
+}
+
+@layer utilities {
+  .bg-white {
+    background-color: #0e1623 !important;
+  }
+
+  .bg-slate-50,
+  .bg-gray-50,
+  .bg-clinical-paper {
+    background-color: #080c14 !important;
+  }
+
+  .bg-clinical-paper\/40 {
+    background-color: rgba(8, 12, 20, 0.4) !important;
+  }
+
+  .bg-clinical-paper\/50 {
+    background-color: rgba(8, 12, 20, 0.5) !important;
+  }
+
+  .bg-clinical-paper\/60 {
+    background-color: rgba(8, 12, 20, 0.6) !important;
+  }
+
+  .bg-clinical-paper\/80 {
+    background-color: rgba(8, 12, 20, 0.8) !important;
+  }
+
+  .bg-clinical-paper\/95 {
+    background-color: rgba(8, 12, 20, 0.95) !important;
+  }
+
+  .bg-red-50,
+  .bg-orange-50,
+  .bg-amber-50,
+  .bg-yellow-50,
+  .bg-blue-50,
+  .bg-green-50,
+  .bg-purple-50,
+  .bg-pink-50,
+  .bg-teal-50,
+  .bg-violet-50 {
+    background-color: #101b2c !important;
+  }
+
+  .bg-red-100,
+  .bg-orange-100,
+  .bg-amber-100,
+  .bg-yellow-100,
+  .bg-blue-100,
+  .bg-green-100,
+  .bg-purple-100,
+  .bg-pink-100,
+  .bg-teal-100,
+  .bg-violet-100,
+  .bg-gray-100,
+  .bg-slate-100 {
+    background-color: #13243a !important;
+  }
+
+  .text-clinical-ink {
+    color: #e2e8f0 !important;
+  }
+
+  .text-clinical-muted {
+    color: #94a3b8 !important;
+  }
+
+  .text-red-600,
+  .text-red-700,
+  .text-red-800,
+  .text-red-900 {
+    color: #f87171 !important;
+  }
+
+  .text-orange-600,
+  .text-orange-700,
+  .text-orange-800,
+  .text-orange-900,
+  .text-amber-600,
+  .text-amber-700,
+  .text-amber-800,
+  .text-amber-900,
+  .text-yellow-700,
+  .text-yellow-800 {
+    color: #fbbf24 !important;
+  }
+
+  .text-green-600,
+  .text-green-700,
+  .text-green-800,
+  .text-emerald-700,
+  .text-teal-700,
+  .text-teal-800 {
+    color: #34d399 !important;
+  }
+
+  .text-blue-600,
+  .text-blue-700,
+  .text-blue-800,
+  .text-purple-700,
+  .text-purple-800,
+  .text-pink-700,
+  .text-violet-700,
+  .text-violet-800 {
+    color: #38bdf8 !important;
+  }
+
+  .border-clinical-line,
+  .border-red-200,
+  .border-orange-200,
+  .border-amber-200,
+  .border-yellow-200,
+  .border-blue-200,
+  .border-green-200,
+  .border-purple-200,
+  .border-pink-200,
+  .border-teal-200,
+  .border-violet-200 {
+    border-color: #1c2d47 !important;
+  }
+
+  input,
+  select,
+  textarea {
+    color-scheme: dark;
+  }
 }
