@@ -260,10 +260,10 @@ export const useCrmStore = create<CrmState>()(
         const t = now();
         const patch: Partial<ViloOpportunity> = { status };
         if (status === "Feasibility Sent" && !prev.feasibilitySentAt) patch.feasibilitySentAt = t;
-        if (status === "Negotiation" && prev.status !== "Negotiation" && !prev.negotiationEnteredAt) {
+        if (status === "Budget / CTA" && prev.status !== "Budget / CTA" && !prev.negotiationEnteredAt) {
           patch.negotiationEnteredAt = t;
         }
-        if (status === "Activated / Closed Won" && !prev.closedWonAt) patch.closedWonAt = t;
+        if (status === "Closed Won" && !prev.closedWonAt) patch.closedWonAt = t;
         if (status === "Closed Lost" && !prev.closedLostAt) patch.closedLostAt = t;
         await get().updateViloOpportunity(idStr, patch);
       },

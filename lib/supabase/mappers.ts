@@ -28,6 +28,11 @@ import type {
 } from "@/lib/supabase/types";
 
 const OPPORTUNITY_TYPES: OpportunityType[] = [
+  "Study",
+  "Biospecimen",
+  "IVD",
+  "Partnership",
+  "Vendor",
   "Phase I",
   "Phase II",
   "Phase III",
@@ -52,12 +57,15 @@ const GENDERS: GenderValue[] = ["Female", "Male", "Non-binary", "Prefer not to s
 const AGE_RANGES: AgeRangeValue[] = ["18-24", "25-34", "35-44", "45-54", "55-64", "65+"];
 
 export function viloStageAppToDb(s: AppViloStage): DbViloStage {
-  if (s === "Activated / Closed Won") return "Activated";
+  if (s === "Budget / CTA") return "Negotiation";
+  if (s === "Closed Won") return "Activated";
   return s as DbViloStage;
 }
 
 export function viloStageDbToApp(s: DbViloStage): AppViloStage {
-  if (s === "Activated") return "Activated / Closed Won";
+  if (s === "Negotiation") return "Budget / CTA";
+  if (s === "Activated") return "Closed Won";
+  if (s === "Nurture") return "Lead Identified";
   return s as AppViloStage;
 }
 

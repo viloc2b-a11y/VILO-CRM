@@ -9,8 +9,8 @@ import { isActionItemOverdue, isAgentOriginatedActionItem } from "@/lib/action-c
 import type { ActionItem, ActionItemStatus, BuEnum } from "@/lib/supabase/types";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { AlertTriangle, BriefcaseBusiness, Clock3, CreditCard, HeartPulse } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { AlertTriangle, BriefcaseBusiness, Clock3, CreditCard, FlaskConical, HeartPulse, Send } from "lucide-react";
+import { useCallback, useMemo, useState, type ComponentProps } from "react";
 
 const BU_LABEL: Record<BuEnum, string> = {
   vilo_research: "Vilo Research",
@@ -34,34 +34,46 @@ const PRIORITY_ES: Record<ActionItem["priority"], string> = {
 
 const ACTION_GROUPS = [
   {
-    key: "due",
-    title: "Tareas vencidas y de hoy",
-    description: "Compromisos abiertos con fecha límite vencida o para hoy.",
+    key: "overdue",
+    title: "Overdue follow-ups",
+    description: "Follow-ups vencidos que bloquean pipeline, cobro o coordinación.",
     icon: AlertTriangle,
   },
   {
-    key: "vitalis",
-    title: "Vitalis sin contactar (<2h)",
-    description: "Leads de paciente generados por reglas de contacto rápido.",
-    icon: HeartPulse,
+    key: "sponsor_replies",
+    title: "Sponsor replies pending",
+    description: "Respuestas de sponsor/CRO que necesitan contestación o registro.",
+    icon: Send,
   },
   {
-    key: "hazlo",
-    title: "Pagos fallidos HazloAsíYa",
-    description: "Expedientes que necesitan recuperación de pago.",
-    icon: CreditCard,
+    key: "feasibility",
+    title: "Feasibility submissions pending",
+    description: "Cuestionarios y submissions que deben enviarse o completarse.",
+    icon: ClipboardIcon,
   },
   {
-    key: "vilo",
-    title: "Vilo sin movimiento (>5 días)",
-    description: "Oportunidades B2B que requieren empuje comercial.",
+    key: "budget",
+    title: "Budget/CTA follow-ups",
+    description: "Negociación, CTA, presupuesto y documentos comerciales pendientes.",
     icon: BriefcaseBusiness,
   },
   {
-    key: "other",
-    title: "Otras acciones abiertas",
-    description: "Tareas operativas en ventana de foco.",
+    key: "startup",
+    title: "Study startup blockers",
+    description: "Bloqueos de startup, activación, site readiness o contratos.",
     icon: Clock3,
+  },
+  {
+    key: "biospecimen",
+    title: "Biospecimen requests pending",
+    description: "Solicitudes de muestra, shipment, chain of custody o laboratorio.",
+    icon: FlaskConical,
+  },
+  {
+    key: "today",
+    title: "Tasks due today",
+    description: "Tareas abiertas con fecha límite de hoy.",
+    icon: HeartPulse,
   },
 ] as const;
 
@@ -73,23 +85,30 @@ function startOfLocalDay(d = new Date()): Date {
   return x;
 }
 
+function ClipboardIcon(props: ComponentProps<typeof CreditCard>) {
+  return <CreditCard {...props} />;
+}
+
 function actionGroupFor(item: ActionItem, today = startOfLocalDay()): ActionGroupKey {
+  const source = item.source ?? "";
+  const text = `${source} ${item.title} ${item.next_action ?? ""} ${item.notes ?? ""} ${item.record_type}`.toLowerCase();
   if (item.due_date) {
     const due = new Date(item.due_date);
     const dueDay = startOfLocalDay(due);
-    if (dueDay.getTime() <= today.getTime()) return "due";
+    if (dueDay.getTime() < today.getTime()) return "overdue";
+    if (dueDay.getTime() === today.getTime()) return "today";
   }
 
-  const source = item.source ?? "";
-  const text = `${source} ${item.title} ${item.next_action ?? ""}`.toLowerCase();
-  if (item.business_unit === "vitalis" && (source.includes("2h") || text.includes("<2h"))) return "vitalis";
-  if (item.business_unit === "hazloasiya" && (source.includes("payment") || text.includes("pago fallido"))) {
-    return "hazlo";
+  if (text.includes("reply") || text.includes("respuesta") || text.includes("respond")) return "sponsor_replies";
+  if (text.includes("feasibility") || text.includes("factibilidad")) return "feasibility";
+  if (text.includes("budget") || text.includes("cta") || text.includes("presupuesto") || text.includes("contract")) return "budget";
+  if (text.includes("startup") || text.includes("activation") || text.includes("activación") || text.includes("blocker")) return "startup";
+  if (text.includes("biospecimen") || text.includes("specimen") || text.includes("shipment") || text.includes("sample")) {
+    return "biospecimen";
   }
-  if (item.business_unit === "vilo_research" && (source.includes("stale") || text.includes("sin movimiento"))) {
-    return "vilo";
-  }
-  return "other";
+  if (item.business_unit === "hazloasiya" && (source.includes("payment") || text.includes("pago fallido"))) return "budget";
+  if (item.business_unit === "vilo_research") return "sponsor_replies";
+  return "today";
 }
 
 function csvEscapeCell(value: string): string {
@@ -212,7 +231,7 @@ export default function ActionCenterClient({
           Exportar CSV
         </button>
       </div>
-      <section className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <section className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-7">
         {grouped.map((group) => {
           const Icon = group.icon;
           return (

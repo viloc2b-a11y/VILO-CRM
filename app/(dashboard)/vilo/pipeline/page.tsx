@@ -10,7 +10,7 @@ export default async function ViloPipelinePage() {
     .from("vilo_opportunities")
     .select("*, organization:organizations(id, name, type), contact:contacts(id, full_name)")
     .eq("archived", false)
-    .not("status", "in", '("Activated","Closed Lost","Nurture")')
+    .not("status", "in", '("Activated","Closed Won","Closed Lost","Nurture")')
     .order("expected_close_date", { ascending: true, nullsFirst: false });
 
   if (error) {
@@ -39,7 +39,7 @@ export default async function ViloPipelinePage() {
         <div className="text-xs font-semibold uppercase tracking-wide text-vilo-600">Vilo Research Group</div>
         <h1 className="text-2xl font-semibold text-clinical-ink">Pipeline Vilo Research</h1>
         <p className="mt-1 max-w-xl text-sm text-clinical-muted">
-          Open deals only (excludes Activated, Closed Lost, and Nurture). Ordered by expected close date.
+          Open deals only. Ordered by expected close date and focused on next action.
         </p>
       </header>
       <KanbanBoard initialOpportunities={initialOpportunities} />

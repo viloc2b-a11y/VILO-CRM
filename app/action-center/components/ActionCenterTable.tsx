@@ -8,8 +8,9 @@ import type { ActionItem, ActionItemStatus, BuEnum } from "@/lib/supabase/types"
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Bot, Check, Clock3, User } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 
 const BU_LABEL: Record<BuEnum, string> = {
   vilo_research: "Vilo Research",
@@ -40,6 +41,24 @@ function priorityBadgeClass(p: ActionItem["priority"]): string {
   return "bg-slate-100 text-slate-700";
 }
 
+function recordHref(item: ActionItem): string {
+  if (item.record_type === "opportunity" || item.record_type === "company" || item.record_type === "contact") return "/vilo";
+  if (item.record_type === "patient" || item.record_type === "campaign") return "/vitalis";
+  if (item.record_type === "submission" || item.record_type === "user") return "/hazlo";
+  if (item.record_type === "study" || item.record_type === "study_site" || item.record_type === "monitoring_visit") {
+    return "/clinical-ops";
+  }
+  if (item.record_type === "study_payment") return "/financials";
+  return "/tasks";
+}
+
+function organizationGroupLabel(item: ActionItem): string {
+  if (item.business_unit === "vilo_research" && ["opportunity", "company", "contact"].includes(item.record_type)) {
+    return item.title || "Unassigned organization";
+  }
+  return "Unassigned organization";
+}
+
 export function ActionCenterTable({
   filtered,
   teammates = [],
@@ -59,6 +78,16 @@ export function ActionCenterTable({
 }) {
   const [pendingId, setPendingId] = useState<string | null>(null);
   const router = useRouter();
+  const groupedRows = filtered.reduce<{ label: string; rows: ActionItem[] }[]>((acc, item) => {
+    const label = organizationGroupLabel(item);
+    let group = acc.find((g) => g.label === label);
+    if (!group) {
+      group = { label, rows: [] };
+      acc.push(group);
+    }
+    group.rows.push(item);
+    return acc;
+  }, []);
 
   async function runCommand(itemId: string, command: UpdateActionItemCommand) {
     setPendingId(itemId);
@@ -144,8 +173,16 @@ export function ActionCenterTable({
               </tr>
             </thead>
             <tbody className="divide-y divide-clinical-line">
-              {filtered.map((item) => {
+              {groupedRows.map((group) => (
+                <Fragment key={group.label}>
+                  <tr key={`${group.label}-header`} className="bg-clinical-paper/80">
+                    <td colSpan={11} className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-clinical-muted">
+                      {group.label}
+                    </td>
+                  </tr>
+                  {group.rows.map((item) => {
                 const overdue = isActionItemOverdue(item);
+                const generated = item.source === "crm_task" || item.source === "crm_opportunity";
                 return (
                   <tr key={item.id} className={cn("hover:bg-vilo-50/50", overdue && "bg-red-50/50")}>
                     <td className="p-3">
@@ -197,11 +234,11 @@ export function ActionCenterTable({
                         </span>
                       </div>
                     </td>
-                    <td className="max-w-[180px] p-3 text-clinical-ink">{item.next_action || "—"}</td>
+                    <td className="max-w-[180px] p-3 text-clinical-ink">{item.next_action || "Create next action"}</td>
                     <td className="whitespace-nowrap p-3 text-clinical-muted">
                       {item.due_date
                         ? format(new Date(item.due_date), "dd MMM yyyy HH:mm", { locale: es })
-                        : "—"}
+                        : "Schedule due date"}
                     </td>
                     <td className="p-3">
                       <span
@@ -215,16 +252,28 @@ export function ActionCenterTable({
                       </span>
                     </td>
                     <td className="p-3 text-right font-mono text-clinical-ink">
-                      {item.value_usd != null ? `$${Number(item.value_usd).toLocaleString("es-US")}` : "—"}
+                      {item.value_usd != null ? `$${Number(item.value_usd).toLocaleString("es-US")}` : "No value"}
                     </td>
                     <td className="max-w-xs truncate p-3 text-clinical-muted" title={item.notes ?? undefined}>
-                      {item.notes || "—"}
+                      {item.notes || "No notes"}
                     </td>
-                    <td className="flex gap-2 justify-center items-center p-3">
+                    <td className="flex flex-wrap items-center justify-center gap-2 p-3">
+                      <Link
+                        href={recordHref(item)}
+                        className="rounded bg-vilo-100 px-2 py-1 text-xs font-medium text-vilo-800 transition-colors hover:bg-vilo-200"
+                      >
+                        Open record
+                      </Link>
+                      <Link
+                        href="/tasks"
+                        className="rounded border border-clinical-line bg-white px-2 py-1 text-xs font-medium text-clinical-ink transition-colors hover:bg-vilo-50"
+                      >
+                        Create follow-up
+                      </Link>
                       <select
                         key={`${item.id}-${item.assigned_to ?? ""}`}
                         aria-label="Asignar ítem"
-                        disabled={pendingId === item.id}
+                        disabled={pendingId === item.id || generated}
                         defaultValue={item.assigned_to || ""}
                         onChange={(e) => {
                           const v = e.target.value;
@@ -245,16 +294,17 @@ export function ActionCenterTable({
                       </select>
                       <button
                         type="button"
-                        disabled={pendingId === item.id}
-                        title="Completar"
-                        className="rounded bg-green-100 px-2 py-1 text-xs text-green-700 transition-colors hover:bg-green-200 disabled:opacity-50"
+                        disabled={pendingId === item.id || generated}
+                        title="Mark done"
+                        className="inline-flex items-center gap-1 rounded bg-green-100 px-2 py-1 text-xs font-medium text-green-700 transition-colors hover:bg-green-200 disabled:opacity-50"
                         onClick={() => void runCommand(item.id, "complete")}
                       >
                         <Check className="h-3.5 w-3.5" />
+                        Mark done
                       </button>
                       <button
                         type="button"
-                        disabled={pendingId === item.id}
+                        disabled={pendingId === item.id || generated}
                         title="+24 h"
                         className="rounded bg-gray-100 px-2 py-1 text-xs text-clinical-ink transition-colors hover:bg-gray-200 disabled:opacity-50"
                         onClick={() => void runCommand(item.id, "snooze_24h")}
@@ -267,7 +317,9 @@ export function ActionCenterTable({
                     </td>
                   </tr>
                 );
-              })}
+                  })}
+                </Fragment>
+              ))}
             </tbody>
           </table>
         </div>

@@ -4,10 +4,11 @@ export const VILO_STAGES = [
   "Response Received",
   "Intro Call Pending",
   "Feasibility Sent",
-  "Negotiation",
-  "Activated / Closed Won",
+  "Budget / CTA",
+  "Startup",
+  "Active Study",
+  "Closed Won",
   "Closed Lost",
-  "Nurture",
 ] as const;
 
 import type { VitalisStage as VitalisStageDb } from "@/lib/supabase/types";

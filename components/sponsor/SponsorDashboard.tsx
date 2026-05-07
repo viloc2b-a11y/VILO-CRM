@@ -105,6 +105,17 @@ function StatCard({
   );
 }
 
+function Insight({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ border: `1px solid ${BDR}`, borderRadius: 10, background: "#0b1220", padding: 12 }}>
+      <div style={{ fontSize: 10, fontWeight: 800, color: MUTED, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+        {label}
+      </div>
+      <div style={{ marginTop: 8, fontSize: 13, lineHeight: 1.45, color: TXT }}>{value}</div>
+    </div>
+  );
+}
+
 export function SponsorDashboard() {
   const [tab, setTab] = useState<"ops" | "report">("ops");
   const [dash, setDash] = useState<DashboardPayload | null>(null);
@@ -189,7 +200,7 @@ export function SponsorDashboard() {
   };
 
   const fmt = (v: number | null | undefined, suffix = "") => {
-    if (v == null || Number.isNaN(Number(v))) return "—";
+    if (v == null || Number.isNaN(Number(v))) return "No data";
     return `${Number(v)}${suffix}`;
   };
 
@@ -216,8 +227,8 @@ export function SponsorDashboard() {
 
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 20 }}>
           <div>
-            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>Sponsor dashboard</h1>
-            <p style={{ margin: "6px 0 0", fontSize: 13, color: MUTED }}>Enrollment engine, execution, pipeline, and sponsor-ready report.</p>
+            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>Sponsor Intelligence</h1>
+            <p style={{ margin: "6px 0 0", fontSize: 13, color: MUTED }}>Sponsor/CRO behavior, active opportunities, revenue visibility, and recommended follow-up.</p>
           </div>
           {loading && <span style={{ fontSize: 12, color: MUTED }}>Updating…</span>}
         </div>
@@ -226,7 +237,7 @@ export function SponsorDashboard() {
           {(
             [
               ["ops", "Operations"],
-              ["report", "Sponsor report"],
+              ["report", "Sponsor Intelligence Report"],
             ] as const
           ).map(([id, label]) => (
             <button
@@ -252,7 +263,7 @@ export function SponsorDashboard() {
         {tab === "ops" && (
           <>
             <h2 style={{ fontSize: 13, fontWeight: 800, color: MUTED, textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 12px" }}>
-              Enrollment engine (7d)
+              Operational execution (7d)
             </h2>
             <div
               style={{
@@ -426,7 +437,7 @@ export function SponsorDashboard() {
           <>
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12, marginBottom: 12 }}>
               <h2 style={{ fontSize: 13, fontWeight: 800, color: MUTED, textTransform: "uppercase", letterSpacing: "0.06em", margin: 0 }}>
-                Weekly snapshot
+                Sponsor/CRO intelligence
               </h2>
               <a
                 href="/api/reports/sponsor/pdf"
@@ -453,17 +464,38 @@ export function SponsorDashboard() {
                 marginBottom: 16,
               }}
             >
+              <StatCard label="Active opportunities" value={fmt(ex?.scheduled_this_week)} borderColor={BLU} />
+              <StatCard label="Active studies" value={fmt(ex?.enrolled_this_month)} borderColor={GRN} />
+              <StatCard label="Revenue generated" value="Connect financials" borderColor={GRN} />
+              <StatCard label="Expected revenue" value="Connect pipeline" borderColor={BLU} />
+              <StatCard label="Average response time" value={fmt(wk.avg_hours_to_contact as number)} borderColor={metricBorder("avg_hours_to_contact", wk.avg_hours_to_contact as number)} />
+              <StatCard label="Startup speed" value="Track startup dates" borderColor={AMB} />
+            </div>
+
+            <div style={{ background: SURF, border: `1px solid ${BDR}`, borderRadius: 12, padding: 16, marginBottom: 20 }}>
+              <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, color: MUTED, textTransform: "uppercase" }}>Sponsor/CRO overview</h3>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+                <Insight label="Payment / budget behavior" value="Review Budget/CTA follow-ups and overdue financial items." />
+                <Insight label="Preferred indications" value={(wk.top_indication as string) || "Add indications from opportunities and studies."} />
+                <Insight label="Historical issues / notes" value="Record negotiation blockers, delayed replies, startup friction, and payment history." />
+                <Insight label="Next recommended action" value={rep.sponsor_message.en || "Create a sponsor follow-up task."} />
+              </div>
+            </div>
+
+            <h3 style={{ fontSize: 13, fontWeight: 800, color: MUTED, textTransform: "uppercase", margin: "0 0 12px" }}>Enrollment metrics (secondary)</h3>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))",
+                gap: 12,
+                marginBottom: 16,
+              }}
+            >
               <StatCard label="Leads this week" value={fmt(wk.leads_this_week as number)} borderColor={BLU} />
               <StatCard label="Enrolled" value={fmt(wk.enrolled_this_week as number)} borderColor={GRN} />
               <StatCard label="Enrollment rate %" value={fmt(wk.enrollment_rate_pct as number, "%")} borderColor={GRN} />
               <StatCard label="Conversion rate %" value={fmt(wk.conversion_rate_pct as number, "%")} borderColor={BLU} />
-              <StatCard label="Avg hours to contact" value={fmt(wk.avg_hours_to_contact as number)} borderColor={metricBorder("avg_hours_to_contact", wk.avg_hours_to_contact as number)} />
-            </div>
-
-            <div style={{ background: SURF, border: `1px solid ${BDR}`, borderRadius: 12, padding: 16, marginBottom: 20 }}>
-              <h3 style={{ margin: "0 0 8px", fontSize: 13, fontWeight: 800, color: MUTED, textTransform: "uppercase" }}>Top indication</h3>
-              <div style={{ fontSize: 18, fontWeight: 800 }}>{(wk.top_indication as string) ?? "—"}</div>
-              <div style={{ fontSize: 12, color: MUTED, marginTop: 4 }}>{fmt(wk.top_indication_leads as number)} leads this week</div>
+              <StatCard label="Average hours to contact" value={fmt(wk.avg_hours_to_contact as number)} borderColor={metricBorder("avg_hours_to_contact", wk.avg_hours_to_contact as number)} />
             </div>
 
             <h3 style={{ fontSize: 13, fontWeight: 800, color: MUTED, textTransform: "uppercase", margin: "0 0 12px" }}>Source breakdown (30d)</h3>

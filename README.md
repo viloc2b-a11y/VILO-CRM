@@ -6,7 +6,7 @@ CRM interno para operar tres líneas de negocio desde una sola consola:
 - **Vitalis**: pipeline B2C de pacientes, leads, prescreen, scheduling y seguimiento.
 - **HazloAsíYa**: pipeline de consumidores, submissions, pagos Square, validación documental y recovery.
 
-La filosofía del producto es simple: **menos dashboards decorativos, más ejecución diaria**. La vista principal es el **Action Center**, una cola única de trabajo que prioriza tareas vencidas, leads calientes, pagos fallidos y oportunidades sin movimiento.
+La filosofía del producto es simple: **menos dashboards decorativos, más ejecución diaria**. El CRM ahora es **organization-centric**: Sponsors, CROs, Labs, Vendors y Partners son el objeto padre; contactos, oportunidades, estudios, tareas, actividades, notas y revenue viven bajo una organización.
 
 Repositorio: <https://github.com/viloc2b-a11y/VILO-CRM>
 
@@ -27,13 +27,16 @@ Repositorio: <https://github.com/viloc2b-a11y/VILO-CRM>
 El CRM se organiza alrededor de cuatro capas:
 
 1. **Captura de datos**
-   - Leads Vitalis entran por formularios, intake, WhatsApp o API.
-   - Oportunidades Vilo entran por carga manual, intake B2B o enriquecimiento.
-   - Submissions HazloAsíYa entran desde el funnel público y se actualizan con eventos de pago.
+   - El **Ingestion Center** recibe datos manuales y CSV.
+   - Oportunidades Vilo deben estar vinculadas a una organización.
+   - Filas incompletas o ambiguas van a staging antes de importar.
+   - Leads Vitalis y submissions HazloAsíYa conservan sus flujos específicos.
 
 2. **Normalización en Supabase**
    - Cada línea de negocio tiene tablas propias.
    - `action_items` funciona como cola operativa global.
+   - `organizations` es el padre operativo para Vilo Research.
+   - `ingestion_staging` guarda filas inválidas, duplicadas o pendientes de revisión.
    - RLS limita qué usuarios ven cada unidad de negocio.
 
 3. **Agentes operativos**
@@ -47,7 +50,40 @@ El CRM se organiza alrededor de cuatro capas:
    - El usuario entra al Action Center.
    - Filtra por unidad, prioridad, estado o búsqueda.
    - Completa, pospone, reasigna o escala tareas.
-   - Cada módulo conserva su pipeline propio para contexto.
+   - Abre el workspace de cada organización para operar contactos, oportunidades, estudios, tareas, notas, actividades y revenue.
+
+---
+
+## Modelo Organization-Centric
+
+La jerarquía principal de Vilo Research es:
+
+```txt
+Organization
+├─ Contacts
+├─ Opportunities / Leads
+├─ Studies
+├─ Tasks
+├─ Activity Timeline
+├─ Notes
+└─ Financials
+```
+
+Reglas clave:
+
+- No se deben crear oportunidades huérfanas.
+- `contacts` pertenecen a `organizations`.
+- `vilo_opportunities` deben estar vinculadas a una organización.
+- Tasks y activity logs soportan `related_type + related_id`.
+- Dashboard, Pipeline y Action Center calculan sobre oportunidades vinculadas.
+
+Workspace:
+
+```txt
+/dashboard/organizations/[organizationId]
+```
+
+Desde `/contacts`, cada organización tiene **Open workspace**.
 
 ---
 
@@ -59,6 +95,8 @@ El CRM se organiza alrededor de cuatro capas:
 | `/vilo` | Pipeline B2B de oportunidades Vilo Research. |
 | `/vilo/pipeline` | Kanban comercial por etapa. |
 | `/vilo/contacts/[id]` | Ficha y timeline de comunicaciones B2B. |
+| `/dashboard/organizations/[organizationId]` | Workspace operativo por Sponsor/CRO/Lab/Vendor/Partner. |
+| `/dashboard/ingestion` | Ingestion Center para carga manual, CSV y staging queue. |
 | `/vitalis` | Pipeline de leads/pacientes Vitalis. |
 | `/vitalis/patients/[id]` | Ficha de paciente y seguimiento. |
 | `/hazlo` | Pipeline HazloAsíYa de submissions y pagos. |
@@ -100,19 +138,51 @@ Tablas principales:
 - `organizations`
 - `contacts`
 - `vilo_opportunities`
+- `ingestion_staging`
 - `communications_log`
 - `studies`
 - `study_sites`
 - `study_payments`
+- `invoices`
 
 Uso operativo:
 
 - Registrar sponsors/CROs.
+- Abrir workspace de organización.
+- Crear contactos dentro de una organización.
 - Crear oportunidades.
 - Avanzar etapas comerciales.
 - Registrar llamadas, emails y notas.
 - Generar reportes sponsor.
 - Crear tareas automáticas si una oportunidad queda sin movimiento.
+
+### 2.1 Ingestion Center
+
+Ruta:
+
+```txt
+/dashboard/ingestion
+```
+
+Opciones:
+
+- **Manual Entry**: crea Organizations, Contacts, Opportunities y Tasks.
+- **CSV Import**: upload, preview, mapping, validación e importación.
+- **Staging Queue**: filas inválidas, duplicadas o pendientes de revisión.
+
+Reglas de CSV:
+
+- Organizations requieren `name` y `type`.
+- Contacts requieren organización y `name`, más `email` o `phone`.
+- Opportunities requieren organización, `name`, `stage`, `next_step`, `next_step_date`.
+- Tasks requieren `title`, `due_date`, `priority`, `next_action`.
+
+Si una oportunidad no tiene organización:
+
+- no se crea como orphan record;
+- se marca inválida;
+- se envía a staging si la tabla existe;
+- se muestra el error: `Organization is required before creating an opportunity.`
 
 ### 3. Datos Vitalis
 
@@ -180,11 +250,21 @@ Campos clave:
 
 El Action Center agrupa:
 
-- tareas vencidas y de hoy;
-- leads Vitalis sin contactar;
-- pagos fallidos HazloAsíYa;
-- oportunidades Vilo sin movimiento;
-- otras acciones abiertas.
+- follow-ups vencidos;
+- sponsor replies pendientes;
+- feasibility submissions;
+- Budget/CTA follow-ups;
+- startup blockers;
+- biospecimen requests;
+- tareas de hoy.
+
+Además, genera acciones desde:
+
+- `action_items`;
+- `tasks`;
+- `vilo_opportunities` vinculadas a organización.
+
+Las acciones Vilo se agrupan por organización cuando hay contexto disponible.
 
 ---
 
@@ -225,6 +305,9 @@ Ejemplos de bloques:
 - `23` a `25`: Orchestrator, triage y agent control.
 - `39` a `42`: communications log por entidad.
 - `43` y `44`: esquema operativo CRM y clinical ops extendido.
+- `45`: alignment execution CRM, etapas Vilo y revenue fields.
+- `46`: Ingestion Center y `ingestion_staging`.
+- `47`: hardening organization-centric, aliases `organization_id`, índices y generic related fields.
 
 Guía principal:
 
@@ -295,6 +378,7 @@ Validar antes de subir:
 ```bash
 npm run build
 npx tsc --noEmit
+npm run lint
 ```
 
 Nota: después de `npm run build`, si el servidor dev estaba vivo, reiniciarlo para evitar bundles mezclados de Next.
@@ -340,12 +424,13 @@ Rutina recomendada:
 
 ## Estado del Proyecto
 
-Último rechequeo local: **2026-05-06**.
+Último rechequeo local: **2026-05-07**.
 
 Validado:
 
 - `npm run build` pasa con build limpio.
 - `npx tsc --noEmit` pasa.
+- `npm run lint` pasa.
 - Las rutas principales cargan sin runtime crash:
   - `/`
   - `/action-center`
@@ -358,6 +443,8 @@ Validado:
   - `/financials`
   - `/analytics`
   - `/contacts`
+  - `/dashboard/ingestion`
+  - `/dashboard/organizations/[organizationId]`
   - `/tasks`
   - `/admin`
   - `/dashboard/sponsor`
@@ -372,6 +459,9 @@ Implementado:
 - Financials.
 - Analytics.
 - Admin panel.
+- Ingestion Center.
+- Organization Workspace.
+- Organization-centric Action Center / Dashboard / Pipeline.
 - Agentes MVP.
 - Migraciones Supabase.
 - Compatibilidad con esquemas incompletos durante setup.
@@ -379,13 +469,16 @@ Implementado:
 Funciona con administración manual:
 
 - `/contacts`: `Quick add`, `Rename`, `Delete`, `Timeline`.
+- `/contacts`: `Open workspace` por organización.
+- `/dashboard/ingestion`: manual entry, CSV import, staging queue.
+- `/dashboard/organizations/[organizationId]`: contacts, opportunities, studies, tasks, notes, activities y financial snapshot.
 - `/tasks`: `Quick add`, `Add task`.
 - `/action-center`: `Asignar a...`, `Completar`, `+1d`.
 - `/clinical-ops`: crear estudios, sitios, visitas y pagos clínicos.
 - `/biospecimens`: crear specimens/shipments y actualizar status.
 - `/financials`: crear invoices y actualizar status.
 - `/admin`: crear usuarios, revisar roles/agentes.
-- `/vilo`: crear oportunidades desde el pipeline.
+- `/vilo`: pipeline por organización; creación redirige a Ingestion Center para evitar oportunidades huérfanas.
 
 Funciona en modo estructura mientras faltan migraciones/datos:
 
@@ -397,6 +490,9 @@ Funciona en modo estructura mientras faltan migraciones/datos:
 Eslabones pendientes antes de producción estricta:
 
 - Confirmar migraciones en Supabase real.
+- Aplicar `45_execution_crm_alignment.sql`.
+- Aplicar `46_ingestion_center.sql`.
+- Aplicar `47_organization_centric_crm.sql`.
 - Aplicar/validar `action_items`.
 - Aplicar/validar `v_action_metrics`.
 - Aplicar/validar `submissions`.

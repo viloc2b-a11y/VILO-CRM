@@ -9,7 +9,7 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 
 // ── ENUMS ────────────────────────────────────────────────────
 
-export type OrgType = "CRO" | "Sponsor" | "Lab" | "Biobank" | "Partner" | "Other";
+export type OrgType = "CRO" | "Sponsor" | "Lab" | "Biobank" | "Vendor" | "Partner" | "Other";
 
 export type PriorityLevel = "Critical" | "High" | "Medium" | "Low";
 
@@ -19,12 +19,21 @@ export type ViloStage =
   | "Response Received"
   | "Intro Call Pending"
   | "Feasibility Sent"
+  | "Budget / CTA"
+  | "Startup"
+  | "Active Study"
+  | "Closed Won"
   | "Negotiation"
   | "Activated"
   | "Closed Lost"
   | "Nurture";
 
 export type OpportunityType =
+  | "Study"
+  | "Biospecimen"
+  | "IVD"
+  | "Partnership"
+  | "Vendor"
   | "Phase I"
   | "Phase II"
   | "Phase III"
@@ -127,6 +136,7 @@ export interface Organization {
   name: string;
   type: OrgType;
   website: string | null;
+  status?: string | null;
   notes: string | null;
   archived: boolean;
   created_at: string;
@@ -140,6 +150,7 @@ export interface Contact {
   role: string | null;
   email: string | null;
   phone: string | null;
+  status?: string | null;
   preferred_contact: PreferredContactMethod;
   notes: string | null;
   archived: boolean;
@@ -161,6 +172,12 @@ export interface ViloOpportunity {
 
   therapeutic_area: string | null;
   opportunity_type: OpportunityType | null;
+  name?: string | null;
+  owner?: string | null;
+  expected_revenue?: number | null;
+  probability?: number | null;
+  next_step?: string | null;
+  next_step_date?: string | null;
   source: LeadSource | null;
   status: ViloStage;
   priority: PriorityLevel;
@@ -269,6 +286,12 @@ export interface Task {
   due_date: string;
   done: boolean;
   done_at: string | null;
+  related_type?: string | null;
+  related_id?: string | null;
+  status?: string | null;
+  next_action?: string | null;
+  owner?: string | null;
+  completed_at?: string | null;
 
   linked_vilo_id: string | null;
   linked_vitalis_id: string | null;
@@ -443,6 +466,20 @@ export interface ActionItem {
   value_usd: number | null;
   notes: string | null;
   source: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface IngestionStaging {
+  id: string;
+  source_type: "manual" | "csv" | "email" | "pdf" | "api";
+  entity_type: "organization" | "contact" | "opportunity" | "study" | "task" | "financial";
+  raw_payload: Json;
+  normalized_payload: Json;
+  validation_status: "pending" | "valid" | "invalid" | "needs_review" | "imported";
+  validation_errors: Json;
+  duplicate_match_id: string | null;
+  imported_record_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -1065,6 +1102,13 @@ export interface Database {
             Pick<NotificationLog, "channel" | "recipient" | "subject" | "status" | "payload">
           >;
         Update: Partial<Pick<NotificationLog, "status" | "payload">>;
+        Relationships: [];
+      };
+      ingestion_staging: {
+        Row: IngestionStaging;
+        Insert: Omit<IngestionStaging, "id" | "created_at" | "updated_at"> &
+          Partial<Pick<IngestionStaging, "id" | "created_at" | "updated_at">>;
+        Update: Partial<Omit<IngestionStaging, "id" | "created_at" | "updated_at">>;
         Relationships: [];
       };
     };

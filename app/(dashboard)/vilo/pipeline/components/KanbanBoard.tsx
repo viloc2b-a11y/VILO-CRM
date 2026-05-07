@@ -9,7 +9,7 @@ import { useState } from "react";
 
 /**
  * Column labels aligned to your sketch; each maps to a single CRM `status` (Vilo stage).
- * "Budget negotiation" + "Contracting" share **Negotiation** in the DB.
+ * "Budget negotiation" + "Contracting" share **Budget / CTA** in the CRM UI.
  */
 const STAGE_COLUMNS: { label: string; stage: ViloStage }[] = [
   { label: "Lead identified", stage: "Lead Identified" },
@@ -17,14 +17,12 @@ const STAGE_COLUMNS: { label: string; stage: ViloStage }[] = [
   { label: "Responded", stage: "Response Received" },
   { label: "Intro call", stage: "Intro Call Pending" },
   { label: "Feasibility sent", stage: "Feasibility Sent" },
-  { label: "Budget negotiation & contracting", stage: "Negotiation" },
+  { label: "Budget / CTA", stage: "Budget / CTA" },
+  { label: "Startup", stage: "Startup" },
+  { label: "Active study", stage: "Active Study" },
 ];
 
-const TERMINAL_STAGES = new Set<ViloStage>([
-  "Activated / Closed Won",
-  "Closed Lost",
-  "Nurture",
-]);
+const TERMINAL_STAGES = new Set<ViloStage>(["Closed Won", "Closed Lost"]);
 
 /** Short labels for the native `<select>` (unique `value` = `ViloStage`). */
 const STAGE_OPTION_LABEL: Partial<Record<ViloStage, string>> = {
@@ -33,10 +31,11 @@ const STAGE_OPTION_LABEL: Partial<Record<ViloStage, string>> = {
   "Response Received": "Responded",
   "Intro Call Pending": "Intro call",
   "Feasibility Sent": "Feasibility sent",
-  Negotiation: "Budget negotiation & contracting",
-  "Activated / Closed Won": "Won (Activated)",
+  "Budget / CTA": "Budget / CTA",
+  Startup: "Startup",
+  "Active Study": "Active study",
+  "Closed Won": "Won",
   "Closed Lost": "Lost",
-  Nurture: "Nurture",
 };
 
 export type PipelineKanbanOpp = {
@@ -132,7 +131,7 @@ export function KanbanBoard({ initialOpportunities }: KanbanBoardProps) {
                       <div className="truncate text-xs text-clinical-muted">{opp.organization_type}</div>
                     )}
                     <div className="mt-1 text-xs text-clinical-muted">
-                      {opp.opportunity_type || "—"} · Rel. {opp.relationship_strength ?? "—"}
+                      {opp.opportunity_type || "Add type"} · Rel. {opp.relationship_strength ?? "No score"}
                     </div>
                     <div className="mt-1 font-mono text-xs text-clinical-ink">
                       ${(opp.potential_value || 0).toLocaleString()}

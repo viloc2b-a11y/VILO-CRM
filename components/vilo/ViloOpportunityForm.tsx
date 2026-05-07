@@ -57,6 +57,8 @@ const empty: ViloFormValues = {
   priority: "Medium",
 };
 
+const OPPORTUNITY_TYPES = ["Study", "Biospecimen", "IVD", "Partnership", "Vendor"] as const;
+
 export function ViloOpportunityForm({
   initial,
   onSubmit,
@@ -98,7 +100,7 @@ export function ViloOpportunityForm({
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className={grid}>
         <label className="space-y-1">
-          <span className="text-xs font-medium text-clinical-muted">Company name</span>
+          <span className="text-xs font-medium text-clinical-muted">Organization</span>
           <Input required value={v.companyName} onChange={(e) => patch("companyName", e.target.value)} />
         </label>
         <label className="space-y-1">
@@ -118,12 +120,19 @@ export function ViloOpportunityForm({
           <Input value={v.phone} onChange={(e) => patch("phone", e.target.value)} />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-medium text-clinical-muted">Therapeutic area</span>
+          <span className="text-xs font-medium text-clinical-muted">Indication</span>
           <Input value={v.therapeuticArea} onChange={(e) => patch("therapeuticArea", e.target.value)} />
         </label>
         <label className="space-y-1">
           <span className="text-xs font-medium text-clinical-muted">Opportunity type</span>
-          <Input value={v.opportunityType} onChange={(e) => patch("opportunityType", e.target.value)} />
+          <Select value={v.opportunityType} onChange={(e) => patch("opportunityType", e.target.value)}>
+            <option value="">Select type</option>
+            {OPPORTUNITY_TYPES.map((type) => (
+              <option key={type} value={type}>
+                {type}
+              </option>
+            ))}
+          </Select>
         </label>
         <label className="space-y-1">
           <span className="text-xs font-medium text-clinical-muted">Source</span>
@@ -134,7 +143,7 @@ export function ViloOpportunityForm({
           <Input type="date" value={v.lastContactDate} onChange={(e) => patch("lastContactDate", e.target.value)} />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-medium text-clinical-muted">Next follow-up date</span>
+          <span className="text-xs font-medium text-clinical-muted">Next step date</span>
           <Input type="date" value={v.nextFollowupDate} onChange={(e) => patch("nextFollowupDate", e.target.value)} />
         </label>
         <label className="space-y-1">
@@ -148,7 +157,7 @@ export function ViloOpportunityForm({
           </Select>
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-medium text-clinical-muted">Potential value</span>
+          <span className="text-xs font-medium text-clinical-muted">Expected revenue</span>
           <Input value={v.potentialValue} onChange={(e) => patch("potentialValue", e.target.value)} placeholder="e.g. 125000" />
         </label>
         <label className="space-y-1">
@@ -163,7 +172,7 @@ export function ViloOpportunityForm({
         </label>
       </div>
       <label className="block space-y-1">
-        <span className="text-xs font-medium text-clinical-muted">Notes</span>
+        <span className="text-xs font-medium text-clinical-muted">Next action / notes</span>
         <Textarea value={v.notes} onChange={(e) => patch("notes", e.target.value)} />
       </label>
       <div className="flex justify-end gap-2 border-t border-clinical-line pt-3">

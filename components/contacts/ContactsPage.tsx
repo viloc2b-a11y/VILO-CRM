@@ -147,6 +147,12 @@ export function ContactsPage() {
               </div>
               {o.notes && <p className="mt-2 line-clamp-3 text-xs text-clinical-muted">{o.notes}</p>}
               <div className="mt-3 flex flex-wrap gap-2">
+                <Link
+                  href={`/dashboard/organizations/${o.id}`}
+                  className="inline-flex items-center justify-center rounded-lg bg-vilo-600 px-2 py-1 text-xs font-medium text-white hover:bg-vilo-700"
+                >
+                  Open workspace
+                </Link>
                 <Button
                   variant="secondary"
                   className="px-2 py-1 text-xs"
