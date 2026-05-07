@@ -638,7 +638,7 @@ function TabButton({
       onClick={onClick}
       className={
         active
-          ? "inline-flex items-center gap-2 rounded-lg bg-vilo-600 px-3 py-2 text-sm font-medium text-white"
+          ? "inline-flex items-center gap-2 rounded-lg border border-vilo-200 bg-vilo-300 px-3 py-2 text-sm font-semibold text-clinical-ink"
           : "inline-flex items-center gap-2 rounded-lg border border-clinical-line bg-white px-3 py-2 text-sm font-medium text-clinical-ink hover:bg-vilo-50"
       }
     >

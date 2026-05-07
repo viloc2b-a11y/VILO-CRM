@@ -37,8 +37,8 @@ function LoginForm() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
-      <div className="w-full max-w-sm rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
+    <div className="flex min-h-screen items-center justify-center bg-clinical-paper p-4">
+      <div className="w-full max-w-sm rounded-2xl border border-clinical-line bg-white p-8 shadow-card">
         <div className="mb-8 text-center">
           <div className="mx-auto mb-4 flex items-center justify-center rounded-2xl bg-[#0d1b35] p-4">
             <Image
@@ -50,29 +50,29 @@ function LoginForm() {
               priority
             />
           </div>
-          <h1 className="text-xl font-bold text-gray-900">VILO CRM</h1>
-          <p className="mt-1 text-sm text-gray-500">Sign in to your account</p>
+          <h1 className="text-xl font-bold text-clinical-ink">VILO CRM</h1>
+          <p className="mt-1 text-sm text-clinical-muted">Sign in to your account</p>
         </div>
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Email</label>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-clinical-muted">Email</label>
             <input
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              className="w-full rounded-lg border border-clinical-line bg-clinical-paper px-3 py-2.5 text-sm text-clinical-ink outline-none placeholder:text-clinical-muted/70 focus:border-vilo-400 focus:ring-2 focus:ring-vilo-200"
               placeholder="you@vilohealth.com"
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Password</label>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-clinical-muted">Password</label>
             <input
               type="password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              className="w-full rounded-lg border border-clinical-line bg-clinical-paper px-3 py-2.5 text-sm text-clinical-ink outline-none placeholder:text-clinical-muted/70 focus:border-vilo-400 focus:ring-2 focus:ring-vilo-200"
               placeholder="••••••••"
             />
           </div>
@@ -82,7 +82,7 @@ function LoginForm() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-lg bg-blue-600 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-60"
+            className="w-full rounded-lg bg-vilo-500 py-2.5 text-sm font-semibold text-[#06111f] transition hover:bg-vilo-400 disabled:opacity-60"
           >
             {loading ? "Signing in…" : "Sign in"}
           </button>
@@ -96,7 +96,7 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-gray-50 text-sm text-gray-500">Loading…</div>
+        <div className="flex min-h-screen items-center justify-center bg-clinical-paper text-sm text-clinical-muted">Loading…</div>
       }
     >
       <LoginForm />
