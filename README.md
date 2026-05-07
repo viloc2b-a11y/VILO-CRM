@@ -97,6 +97,7 @@ Desde `/contacts`, cada organización tiene **Open workspace**.
 | `/vilo/contacts/[id]` | Ficha y timeline de comunicaciones B2B. |
 | `/dashboard/organizations/[organizationId]` | Workspace operativo por Sponsor/CRO/Lab/Vendor/Partner. |
 | `/dashboard/ingestion` | Ingestion Center para carga manual, CSV y staging queue. |
+| `/dashboard/sponsor` | Sponsor Intelligence: reporte y métricas operativas cuando hay datos reales en Supabase. |
 | `/vitalis` | Pipeline de leads/pacientes Vitalis. |
 | `/vitalis/patients/[id]` | Ficha de paciente y seguimiento. |
 | `/hazlo` | Pipeline HazloAsíYa de submissions y pagos. |
@@ -166,23 +167,25 @@ Ruta:
 
 Opciones:
 
-- **Manual Entry**: crea Organizations, Contacts, Opportunities y Tasks.
-- **CSV Import**: upload, preview, mapping, validación e importación.
+- **Manual Entry**: Organizations, Contacts, Opportunities, Studies, Communications, Patient Leads, Financial Items y Tasks / Follow-ups. Si la tabla de Supabase no existe o el usuario no tiene acceso, la pestaña muestra un estado *not connected* y no envía el formulario.
+- **CSV Import**: upload, preview, mapping, validación e importación (entidades soportadas en CSV: Organizations, Contacts, Opportunities, Tasks).
 - **Staging Queue**: filas inválidas, duplicadas o pendientes de revisión.
 
-Reglas de CSV:
+**Sponsor Intelligence** (`/dashboard/sponsor`): las métricas operativas del reporte dependen de conteos reales sobre tablas existentes (p. ej. `vilo_opportunities`, `studies`, `communications_log`, `patient_leads`, `invoices`). Sin filas operativas, la UI permanece en estado vacío operativo; no se muestran KPIs como si fueran datos confirmados.
+
+Reglas de CSV (alineadas al validador del servidor):
 
 - Organizations requieren `name` y `type`.
 - Contacts requieren organización y `name`, más `email` o `phone`.
-- Opportunities requieren organización, `name`, `stage`, `next_step`, `next_step_date`.
-- Tasks requieren `title`, `due_date`, `priority`, `next_action`.
+- Opportunities requieren `organization_id` (o nombre de organización resoluble), `indication`, `study_type` (campo `type` o `study_type`), `stage`, `expected_value` (`expected_revenue` o `expected_value`), `next_follow_up_date` (`next_step_date` o `next_follow_up_date`), `owner` y `notes`.
+- Tasks requieren `title`, `owner`, `due_date`, `priority`, `status` y `notes`.
 
 Si una oportunidad no tiene organización:
 
 - no se crea como orphan record;
 - se marca inválida;
 - se envía a staging si la tabla existe;
-- se muestra el error: `Organization is required before creating an opportunity.`
+- el validador exige organización antes de insertar.
 
 ### 3. Datos Vitalis
 
