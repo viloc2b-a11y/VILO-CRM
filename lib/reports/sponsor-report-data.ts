@@ -1,4 +1,4 @@
-import { serviceClient } from "@/lib/supabase/service-role";
+import { getServiceClientOrNull } from "@/lib/supabase/service-role";
 
 export type SponsorSourceRow = {
   source: string;
@@ -45,6 +45,21 @@ function buildSponsorMessages(weekly: Record<string, unknown> | null): { en: str
 
 /** Datos alineados a vistas `03_sponsor_dashboard.sql` — usado por JSON API y PDF. */
 export async function fetchSponsorReportPayload(): Promise<SponsorReportPayload> {
+  const serviceClient = getServiceClientOrNull();
+
+  if (!serviceClient) {
+    return {
+      report: null,
+      enrollment_7d: null,
+      execution: null,
+      pipeline: [],
+      source_breakdown: [],
+      screen_fail_top: [],
+      sponsor_message: buildSponsorMessages(null),
+      generated_at: new Date().toISOString(),
+    };
+  }
+
   const [
     { data: weekly },
     { data: enrollment7d },
