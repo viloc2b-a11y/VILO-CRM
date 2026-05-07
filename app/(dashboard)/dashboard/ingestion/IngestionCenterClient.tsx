@@ -46,12 +46,24 @@ const ENTITY_LABEL: Record<Entity, string> = {
 const REQUIRED: Record<Entity, string[]> = {
   organization: ["name", "type"],
   contact: ["name", "email_or_phone", "organization_name"],
-  opportunity: ["name", "organization_name", "stage", "next_step", "next_step_date"],
-  study: ["organization_id", "protocol_number", "indication", "status"],
-  communication: ["organization_id", "communication_type", "direction", "date", "topic"],
-  patient_lead: ["full_name", "phone", "indication", "source", "status"],
-  financial: ["organization_id", "item_type", "amount", "status", "due_date"],
-  task: ["title", "due_date", "priority", "next_action"],
+  // NOTE: These are UI-level requirements; some values are persisted into existing table columns,
+  // and the remainder is packed into existing `notes`/`metadata` columns when needed.
+  opportunity: ["organization_id", "indication", "type", "stage", "expected_revenue", "next_step_date", "notes"],
+  study: [
+    "organization_id",
+    "protocol_number",
+    "indication",
+    "status",
+    "startup_date",
+    "enrollment_target",
+    "current_enrolled",
+    "budget_status",
+    "cta_status",
+  ],
+  communication: ["organization_id", "communication_type", "direction", "date", "topic", "follow_up_needed", "notes"],
+  patient_lead: ["full_name", "phone", "indication", "source", "status", "contacted_at", "enrolled", "screen_failed"],
+  financial: ["organization_id", "item_type", "amount", "status", "due_date", "notes"],
+  task: ["title", "owner", "due_date", "priority", "status", "notes"],
 };
 
 const FIELD_OPTIONS: Record<Entity, string[]> = {
@@ -72,12 +84,13 @@ const FIELD_OPTIONS: Record<Entity, string[]> = {
     "next_step",
     "next_step_date",
     "last_contact_date",
+    "notes",
   ],
   study: ["organization_id", "protocol_number", "indication", "status", "startup_date", "enrollment_target", "current_enrolled", "budget_status", "cta_status", "notes"],
   communication: ["organization_id", "contact_id", "communication_type", "direction", "date", "topic", "follow_up_needed", "notes"],
   patient_lead: ["study_id", "full_name", "phone", "email", "indication", "source", "status", "contacted_at", "enrolled", "screen_failed", "notes"],
   financial: ["organization_id", "study_id", "item_type", "amount", "status", "due_date", "notes"],
-  task: ["related_type", "related_id", "title", "priority", "due_date", "next_action", "owner", "status"],
+  task: ["organization_id", "title", "owner", "due_date", "priority", "status", "notes"],
 };
 const CSV_ENTITIES: Entity[] = ["organization", "contact", "opportunity", "task"];
 
@@ -125,23 +138,22 @@ function errorsFor(entity: Entity, row: CsvRow): string[] {
     if (!row.organization_id && !row.organization_name) e.push("organization required");
   }
   if (entity === "opportunity") {
-    for (const f of ["name", "stage", "next_step", "next_step_date"]) if (!row[f]) e.push(`${f} required`);
-    if (!row.organization_id && !row.organization_name) e.push("organization required");
+    for (const f of REQUIRED.opportunity) if (!row[f]) e.push(`${f} required`);
   }
   if (entity === "study") {
-    for (const f of ["organization_id", "protocol_number", "indication", "status"]) if (!row[f]) e.push(`${f} required`);
+    for (const f of REQUIRED.study) if (!row[f]) e.push(`${f} required`);
   }
   if (entity === "communication") {
-    for (const f of ["organization_id", "communication_type", "direction", "date", "topic"]) if (!row[f]) e.push(`${f} required`);
+    for (const f of REQUIRED.communication) if (!row[f]) e.push(`${f} required`);
   }
   if (entity === "patient_lead") {
-    for (const f of ["full_name", "phone", "indication", "source", "status"]) if (!row[f]) e.push(`${f} required`);
+    for (const f of REQUIRED.patient_lead) if (!row[f]) e.push(`${f} required`);
   }
   if (entity === "financial") {
-    for (const f of ["organization_id", "item_type", "amount", "status", "due_date"]) if (!row[f]) e.push(`${f} required`);
+    for (const f of REQUIRED.financial) if (!row[f]) e.push(`${f} required`);
   }
   if (entity === "task") {
-    for (const f of ["title", "due_date", "priority", "next_action"]) if (!row[f]) e.push(`${f} required`);
+    for (const f of REQUIRED.task) if (!row[f]) e.push(`${f} required`);
   }
   return e;
 }
@@ -435,17 +447,17 @@ function OpportunityFields({ organizations, contacts }: { organizations: OrgOpti
       <Field name="organization_name" label="Organization name fallback" />
       <SelectField name="contact_id" label="Contact" options={contacts.map((c) => ({ value: c.id, label: c.full_name }))} />
       <Field name="contact_name" label="Contact name fallback" />
-      <Field name="name" label="Opportunity name" required />
-      <SelectField name="type" label="Type" options={["Study", "Biospecimen", "IVD", "Partnership", "Vendor"]} />
+      <Field name="name" label="Opportunity name (optional)" />
+      <SelectField name="type" label="Study type" options={["Study", "Biospecimen", "IVD", "Partnership", "Vendor"]} />
       <Field name="indication" label="Indication" required />
-      <Field name="expected_revenue" label="Expected revenue" type="number" />
+      <Field name="expected_revenue" label="Expected value" type="number" required />
       <Field name="probability" label="Probability" type="number" min={0} max={100} />
       <SelectField name="stage" label="Stage" options={[...VILO_STAGES]} />
-      <Field name="owner" label="Owner" />
-      <Field name="next_step" label="Next step" required />
+      <Field name="owner" label="Owner" required />
+      <Field name="next_step" label="Next step" />
       <Field name="next_step_date" label="Next follow-up date" type="date" required />
       <Field name="last_contact_date" label="Last contact date" type="date" />
-      <TextAreaField name="notes" label="Notes" />
+      <TextAreaField name="notes" label="Notes" required />
     </div>
   );
 }
@@ -457,11 +469,11 @@ function StudyFields({ organizations }: { organizations: OrgOption[] }) {
       <Field name="protocol_number" label="Protocol number" required />
       <Field name="indication" label="Indication" required />
       <SelectField name="status" label="Status" options={["planning", "active", "paused", "closed"]} />
-      <Field name="startup_date" label="Startup date" type="date" />
-      <Field name="enrollment_target" label="Enrollment target" type="number" />
-      <Field name="current_enrolled" label="Current enrolled" type="number" />
-      <Field name="budget_status" label="Budget status" />
-      <Field name="cta_status" label="CTA status" />
+      <Field name="startup_date" label="Startup date" type="date" required />
+      <Field name="enrollment_target" label="Enrollment target" type="number" required />
+      <Field name="current_enrolled" label="Current enrolled" type="number" required />
+      <Field name="budget_status" label="Budget status" required />
+      <Field name="cta_status" label="CTA status" required />
       <TextAreaField name="notes" label="Notes" />
     </div>
   );
@@ -477,7 +489,7 @@ function CommunicationFields({ organizations, contacts }: { organizations: OrgOp
       <Field name="date" label="Date" type="datetime-local" required />
       <Field name="topic" label="Topic" required />
       <SelectField name="follow_up_needed" label="Follow-up needed" options={["no", "yes"]} />
-      <TextAreaField name="notes" label="Notes" />
+      <TextAreaField name="notes" label="Notes" required />
     </div>
   );
 }
@@ -492,7 +504,7 @@ function PatientLeadFields({ studies }: { studies: StudyOption[] }) {
       <Field name="indication" label="Indication" required />
       <Field name="source" label="Source" required />
       <SelectField name="status" label="Status" options={["New Lead", "Responded", "Scheduled", "Enrolled", "Screen Fail"]} />
-      <Field name="contacted_at" label="Contacted at" type="datetime-local" />
+      <Field name="contacted_at" label="Contacted at" type="datetime-local" required />
       <SelectField name="enrolled" label="Enrolled" options={["no", "yes"]} />
       <SelectField name="screen_failed" label="Screen failed" options={["no", "yes"]} />
       <TextAreaField name="notes" label="Notes" />
@@ -509,7 +521,7 @@ function FinancialFields({ organizations, studies }: { organizations: OrgOption[
       <Field name="amount" label="Amount" type="number" required />
       <SelectField name="status" label="Status" options={["draft", "sent", "partially_paid", "paid", "overdue", "void"]} />
       <Field name="due_date" label="Due date" type="date" required />
-      <TextAreaField name="notes" label="Notes" />
+      <TextAreaField name="notes" label="Notes" required />
     </div>
   );
 }
@@ -518,15 +530,12 @@ function TaskFields({ organizations }: { organizations: OrgOption[] }) {
   return (
     <div className="grid gap-3 md:grid-cols-2">
       <SelectField name="organization_id" label="Organization" options={organizations.map((o) => ({ value: o.id, label: o.name }))} />
-      <SelectField name="related_type" label="Related record type" options={["opportunity", "patient", "organization", "contact"]} />
-      <Field name="related_id" label="Related record id" />
       <Field name="title" label="Title" required />
+      <Field name="owner" label="Owner" required />
       <SelectField name="priority" label="Priority" options={["High", "Medium", "Low"]} />
       <Field name="due_date" label="Due date" type="date" required />
-      <Field name="next_action" label="Next action" required />
-      <Field name="owner" label="Owner" />
-      <SelectField name="status" label="Status" options={["open", "in_progress", "completed"]} />
-      <TextAreaField name="notes" label="Notes" />
+      <SelectField name="status" label="Status" options={["pending", "in_progress", "completed", "canceled"]} />
+      <TextAreaField name="notes" label="Notes" required />
     </div>
   );
 }
@@ -568,11 +577,11 @@ function SelectField({
   );
 }
 
-function TextAreaField({ label, name }: { label: string; name: string }) {
+function TextAreaField({ label, name, required }: { label: string; name: string; required?: boolean }) {
   return (
     <label className="space-y-1 md:col-span-2">
       <span className="text-xs font-medium text-clinical-muted">{label}</span>
-      <Textarea name={name} />
+      <Textarea name={name} required={required} />
     </label>
   );
 }

@@ -191,23 +191,17 @@ function validateContact(row: CsvRow): string[] {
 function validateOpportunity(row: CsvRow): string[] {
   const errors: string[] = [];
   if (!row.name && !row.indication) errors.push("name or indication is required");
-  if (!row.organization_id && !row.organization_name) {
-    errors.push("Organization is required before creating an opportunity.");
-  }
+  if (!row.organization_id && !row.organization_name) errors.push("organization_id is required");
+  if (!row.indication) errors.push("indication is required");
+  if (!row.type && !row.study_type) errors.push("study_type is required");
   if (!row.stage) errors.push("stage is required");
-  if (!row.next_step && !row.notes) errors.push("next_step or notes is required");
-  if (!row.next_step_date && !row.next_follow_up_date) errors.push("next_step_date or next_follow_up_date is required");
+  if (!row.expected_revenue && !row.expected_value) errors.push("expected_value is required");
+  if (!row.next_step_date && !row.next_follow_up_date) errors.push("next_follow_up_date is required");
+  if (!row.owner) errors.push("owner is required");
+  if (!row.notes) errors.push("notes is required");
+  if (!row.stage) errors.push("stage is required");
   if (row.type && !OPP_TYPES.has(row.type)) errors.push("type must be Study, Biospecimen, IVD, Partnership, or Vendor");
-  return errors;
-}
-
-function validateTask(row: CsvRow): string[] {
-  const errors: string[] = [];
-  if (!row.title) errors.push("title is required");
-  if (!row.due_date) errors.push("due_date is required");
-  if (!row.priority) errors.push("priority is required");
-  if (row.priority && !PRIORITIES.has(row.priority)) errors.push("priority must be High, Medium, or Low");
-  if (!row.next_action) errors.push("next_action is required");
+  if (row.study_type && !OPP_TYPES.has(row.study_type)) errors.push("study_type must be Study, Biospecimen, IVD, Partnership, or Vendor");
   return errors;
 }
 
@@ -217,6 +211,11 @@ function validateStudy(row: CsvRow): string[] {
   if (!row.protocol_number) errors.push("protocol_number is required");
   if (!row.indication) errors.push("indication is required");
   if (!row.status) errors.push("status is required");
+  if (!row.startup_date) errors.push("startup_date is required");
+  if (!row.enrollment_target) errors.push("enrollment_target is required");
+  if (!row.current_enrolled) errors.push("current_enrolled is required");
+  if (!row.budget_status) errors.push("budget_status is required");
+  if (!row.cta_status) errors.push("cta_status is required");
   return errors;
 }
 
@@ -227,6 +226,8 @@ function validateCommunication(row: CsvRow): string[] {
   if (!row.direction) errors.push("direction is required");
   if (!row.date) errors.push("date is required");
   if (!row.topic) errors.push("topic is required");
+  if (!row.follow_up_needed) errors.push("follow_up_needed is required");
+  if (!row.notes) errors.push("notes is required");
   return errors;
 }
 
@@ -237,6 +238,9 @@ function validatePatientLead(row: CsvRow): string[] {
   if (!row.indication) errors.push("indication is required");
   if (!row.source) errors.push("source is required");
   if (!row.status) errors.push("status is required");
+  if (!row.contacted_at) errors.push("contacted_at is required");
+  if (!row.enrolled) errors.push("enrolled is required");
+  if (!row.screen_failed) errors.push("screen_failed is required");
   return errors;
 }
 
@@ -247,6 +251,19 @@ function validateFinancial(row: CsvRow): string[] {
   if (!row.amount) errors.push("amount is required");
   if (!row.status) errors.push("status is required");
   if (!row.due_date) errors.push("due_date is required");
+  if (!row.notes) errors.push("notes is required");
+  return errors;
+}
+
+function validateTaskV2(row: CsvRow): string[] {
+  const errors: string[] = [];
+  if (!row.title) errors.push("title is required");
+  if (!row.owner) errors.push("owner is required");
+  if (!row.due_date) errors.push("due_date is required");
+  if (!row.priority) errors.push("priority is required");
+  if (row.priority && !PRIORITIES.has(row.priority)) errors.push("priority must be High, Medium, or Low");
+  if (!row.status) errors.push("status is required");
+  if (!row.notes) errors.push("notes is required");
   return errors;
 }
 
@@ -258,7 +275,7 @@ function validateEntity(entity: EntityType, row: CsvRow): string[] {
   if (entity === "communication") return validateCommunication(row);
   if (entity === "patient_lead") return validatePatientLead(row);
   if (entity === "financial") return validateFinancial(row);
-  return validateTask(row);
+  return validateTaskV2(row);
 }
 
 function normalizeStudyStatus(status: string): string {
@@ -367,6 +384,7 @@ async function createOpportunityRow(row: CsvRow, activity: "created" | "imported
     .from("vilo_opportunities")
     .insert({
       org_id: orgRow.id,
+      organization_id: orgRow.id,
       contact_id: (contact as LooseRow | null)?.id ?? null,
       company_name: orgRow.name,
       contact_name: row.contact_name || String((contact as LooseRow | null)?.full_name ?? "") || null,
@@ -380,11 +398,14 @@ async function createOpportunityRow(row: CsvRow, activity: "created" | "imported
       priority: "High",
       potential_value: row.expected_revenue || row.expected_value ? Number(row.expected_revenue || row.expected_value) : null,
       notes: [
-        `Opportunity: ${row.name || row.indication}`,
-        `Type: ${row.type || row.study_type || "Study"}`,
+        row.name ? `Opportunity: ${row.name}` : "",
+        `Indication: ${row.indication}`,
+        `Study type: ${row.type || row.study_type}`,
+        `Stage: ${row.stage}`,
+        `Owner: ${row.owner}`,
         row.next_step ? `Next step: ${row.next_step}` : "",
-        row.owner ? `Owner: ${row.owner}` : "",
-        row.notes || "",
+        `Expected value: ${row.expected_revenue || row.expected_value}`,
+        row.notes,
       ]
         .filter(Boolean)
         .join(" | "),
@@ -420,12 +441,13 @@ async function createStudyRow(row: CsvRow, activity: "created" | "imported") {
       status: normalizeStudyStatus(row.status),
       notes: [
         `Sponsor org_id: ${String(orgRow.id ?? "")}`,
-        row.indication ? `Indication: ${row.indication}` : "",
+        `Indication: ${row.indication}`,
+        `Startup date: ${row.startup_date}`,
+        `Enrollment target: ${row.enrollment_target}`,
+        `Current enrolled: ${row.current_enrolled}`,
+        `Budget status: ${row.budget_status}`,
+        `CTA status: ${row.cta_status}`,
         row.notes,
-        row.enrollment_target ? `Enrollment target: ${row.enrollment_target}` : "",
-        row.current_enrolled ? `Current enrolled: ${row.current_enrolled}` : "",
-        row.budget_status ? `Budget status: ${row.budget_status}` : "",
-        row.cta_status ? `CTA status: ${row.cta_status}` : "",
       ]
         .filter(Boolean)
         .join(" | "),
@@ -490,7 +512,9 @@ async function createPatientLeadRow(row: CsvRow, activity: "created" | "imported
       current_stage: stage,
       last_contact_date: row.contacted_at ? dateOnly(row.contacted_at) : null,
       screen_fail_reason: stage === "Screen Fail" ? row.notes || "Screen failed" : null,
-      notes: [`Study ID: ${row.study_id || "none"}`, row.notes].filter(Boolean).join(" | "),
+      notes: [`Study ID: ${row.study_id || "none"}`, `Status: ${row.status}`, `Enrolled: ${row.enrolled}`, `Screen failed: ${row.screen_failed}`, row.notes]
+        .filter(Boolean)
+        .join(" | "),
       archived: false,
     })
     .select()
@@ -550,18 +574,16 @@ async function createTaskRow(row: CsvRow, activity: "created" | "imported") {
     .from("tasks")
     .insert({
       title: row.title,
-      channel: row.related_type === "patient" ? "vitalis" : "vilo",
+      channel: "vilo",
       priority: row.priority || "Medium",
       due_date: dateOnly(row.due_date),
       done: row.status === "completed",
-      related_type: row.related_type || (row.organization_id ? "organization" : null),
-      related_id: row.related_id || row.organization_id || null,
-      next_action: row.next_action || null,
+      related_type: row.organization_id ? "organization" : null,
+      related_id: row.organization_id || null,
       owner: row.owner || null,
-      status: row.status || "open",
+      status: (row.status as unknown as string) || "pending",
+      next_action: row.notes || null,
       completed_at: row.status === "completed" ? new Date().toISOString() : null,
-      linked_vilo_id: row.related_type === "opportunity" ? row.related_id || null : null,
-      linked_vitalis_id: row.related_type === "patient" ? row.related_id || null : null,
     })
     .select()
     .single();
@@ -572,7 +594,7 @@ async function createTaskRow(row: CsvRow, activity: "created" | "imported") {
     related_id: taskRow.id as string,
     activity_type: "follow_up",
     title: activity === "imported" ? "Follow-up task imported" : "Follow-up task created",
-    description: duplicate ? `${row.next_action} (possible duplicate)` : row.next_action,
+    description: duplicate ? `${row.notes} (possible duplicate)` : row.notes,
   });
   return { id: taskRow.id as string, duplicate };
 }

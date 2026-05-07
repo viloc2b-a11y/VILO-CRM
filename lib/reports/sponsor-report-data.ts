@@ -119,7 +119,7 @@ export async function fetchSponsorReportPayload(): Promise<SponsorReportPayload>
     pipeline: (pipeline ?? []) as SponsorPipelineRow[],
     source_breakdown: (sources ?? []) as SponsorSourceRow[],
     screen_fail_top: (fails ?? []) as SponsorFailRow[],
-    operational_counts: operationalCounts,
+    operational_counts: operationalDataConnected ? operationalCounts : { opportunities: 0, studies: 0, communications: 0, patient_leads: 0, financial_items: 0 },
     operational_data_connected: operationalDataConnected,
     sponsor_message: buildSponsorMessages(report),
     generated_at: new Date().toISOString(),
