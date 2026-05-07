@@ -39,6 +39,14 @@ type ReportPayload = {
   report: Record<string, unknown> | null;
   source_breakdown: { source: string; total: number; enrolled: number; enrollment_rate_pct: number }[];
   screen_fail_top3: FailRow[];
+  operational_counts?: {
+    opportunities: number;
+    studies: number;
+    communications: number;
+    patient_leads: number;
+    financial_items: number;
+  };
+  operational_data_connected?: boolean;
   sponsor_message: { en: string; es: string };
   generated_at: string;
 };
@@ -112,6 +120,35 @@ function Insight({ label, value }: { label: string; value: string }) {
         {label}
       </div>
       <div style={{ marginTop: 8, fontSize: 13, lineHeight: 1.45, color: TXT }}>{value}</div>
+    </div>
+  );
+}
+
+function OperationalEmptyState() {
+  return (
+    <div style={{ background: SURF, border: `1px dashed ${BDR}`, borderRadius: 12, padding: 20, marginBottom: 20 }}>
+      <div style={{ fontSize: 14, fontWeight: 800, color: TXT }}>
+        Operational metrics not connected yet.
+      </div>
+      <p style={{ margin: "8px 0 14px", fontSize: 13, lineHeight: 1.5, color: MUTED }}>
+        Add opportunities, studies, communications, patient leads, and financial items through Ingestion Center.
+      </p>
+      <a
+        href="/dashboard/ingestion"
+        style={{
+          display: "inline-flex",
+          padding: "8px 12px",
+          borderRadius: 8,
+          border: `1px solid ${BDR}`,
+          background: "#0b1220",
+          color: TXT,
+          fontSize: 12,
+          fontWeight: 700,
+          textDecoration: "none",
+        }}
+      >
+        Open Ingestion Center
+      </a>
     </div>
   );
 }
@@ -435,140 +472,196 @@ export function SponsorDashboard() {
 
         {tab === "report" && rep && (
           <>
-            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12, marginBottom: 12 }}>
-              <h2 style={{ fontSize: 13, fontWeight: 800, color: MUTED, textTransform: "uppercase", letterSpacing: "0.06em", margin: 0 }}>
-                Sponsor/CRO intelligence
-              </h2>
-              <a
-                href="/api/reports/sponsor/pdf"
-                download
-                style={{
-                  padding: "8px 14px",
-                  borderRadius: 8,
-                  border: `1px solid ${BLU}`,
-                  background: "rgba(56,189,248,0.12)",
-                  color: BLU,
-                  fontSize: 12,
-                  fontWeight: 700,
-                  textDecoration: "none",
-                }}
-              >
-                Download PDF report
-              </a>
-            </div>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))",
-                gap: 12,
-                marginBottom: 16,
-              }}
-            >
-              <StatCard label="Active opportunities" value={fmt(ex?.scheduled_this_week)} borderColor={BLU} />
-              <StatCard label="Active studies" value={fmt(ex?.enrolled_this_month)} borderColor={GRN} />
-              <StatCard label="Revenue generated" value="Connect financials" borderColor={GRN} />
-              <StatCard label="Expected revenue" value="Connect pipeline" borderColor={BLU} />
-              <StatCard label="Average response time" value={fmt(wk.avg_hours_to_contact as number)} borderColor={metricBorder("avg_hours_to_contact", wk.avg_hours_to_contact as number)} />
-              <StatCard label="Startup speed" value="Track startup dates" borderColor={AMB} />
-            </div>
-
-            <div style={{ background: SURF, border: `1px solid ${BDR}`, borderRadius: 12, padding: 16, marginBottom: 20 }}>
-              <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, color: MUTED, textTransform: "uppercase" }}>Sponsor/CRO overview</h3>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
-                <Insight label="Payment / budget behavior" value="Review Budget/CTA follow-ups and overdue financial items." />
-                <Insight label="Preferred indications" value={(wk.top_indication as string) || "Add indications from opportunities and studies."} />
-                <Insight label="Historical issues / notes" value="Record negotiation blockers, delayed replies, startup friction, and payment history." />
-                <Insight label="Next recommended action" value={rep.sponsor_message.en || "Create a sponsor follow-up task."} />
-              </div>
-            </div>
-
-            <h3 style={{ fontSize: 13, fontWeight: 800, color: MUTED, textTransform: "uppercase", margin: "0 0 12px" }}>Enrollment metrics (secondary)</h3>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))",
-                gap: 12,
-                marginBottom: 16,
-              }}
-            >
-              <StatCard label="Leads this week" value={fmt(wk.leads_this_week as number)} borderColor={BLU} />
-              <StatCard label="Enrolled" value={fmt(wk.enrolled_this_week as number)} borderColor={GRN} />
-              <StatCard label="Enrollment rate %" value={fmt(wk.enrollment_rate_pct as number, "%")} borderColor={GRN} />
-              <StatCard label="Conversion rate %" value={fmt(wk.conversion_rate_pct as number, "%")} borderColor={BLU} />
-              <StatCard label="Average hours to contact" value={fmt(wk.avg_hours_to_contact as number)} borderColor={metricBorder("avg_hours_to_contact", wk.avg_hours_to_contact as number)} />
-            </div>
-
-            <h3 style={{ fontSize: 13, fontWeight: 800, color: MUTED, textTransform: "uppercase", margin: "0 0 12px" }}>Source breakdown (30d)</h3>
-            <div style={{ background: SURF, border: `1px solid ${BDR}`, borderRadius: 12, padding: 16, marginBottom: 20 }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                <thead>
-                  <tr style={{ color: MUTED, textAlign: "left" }}>
-                    <th style={{ padding: "6px 4px" }}>Source</th>
-                    <th style={{ padding: "6px 4px" }}>Total</th>
-                    <th style={{ padding: "6px 4px" }}>Enrolled</th>
-                    <th style={{ padding: "6px 4px" }}>Rate</th>
-                    <th style={{ padding: "6px 4px", width: 120 }}>Bar</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(rep.source_breakdown ?? []).map((s) => (
-                    <tr key={s.source} style={{ borderTop: `1px solid ${BDR}` }}>
-                      <td style={{ padding: "8px 4px" }}>{s.source}</td>
-                      <td style={{ padding: "8px 4px" }}>{s.total}</td>
-                      <td style={{ padding: "8px 4px" }}>{s.enrolled}</td>
-                      <td style={{ padding: "8px 4px" }}>{fmt(s.enrollment_rate_pct, "%")}</td>
-                      <td style={{ padding: "8px 4px" }}>
-                        <div style={{ height: 8, background: "#0f172a", borderRadius: 4, overflow: "hidden" }}>
-                          <div style={{ width: `${Math.min(100, s.enrollment_rate_pct)}%`, height: "100%", background: GRN }} />
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {!rep.source_breakdown?.length && <div style={{ color: MUTED, fontSize: 13 }}>No source data.</div>}
-            </div>
-
-            <div style={{ background: "rgba(56,189,248,0.08)", border: `1px solid ${BLU}`, borderRadius: 12, padding: 16 }}>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
-                <span style={{ fontSize: 12, fontWeight: 800, color: BLU, textTransform: "uppercase" }}>Sponsor message</span>
-                <button
-                  type="button"
-                  onClick={() => void copyText(rep.sponsor_message.en)}
+            {!rep.operational_data_connected ? (
+              <>
+                <OperationalEmptyState />
+                <div style={{ background: "rgba(56,189,248,0.08)", border: `1px solid ${BLU}`, borderRadius: 12, padding: 16 }}>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+                    <span style={{ fontSize: 12, fontWeight: 800, color: BLU, textTransform: "uppercase" }}>Sponsor message</span>
+                    <button
+                      type="button"
+                      onClick={() => void copyText(rep.sponsor_message.en)}
+                      style={{
+                        padding: "6px 12px",
+                        borderRadius: 8,
+                        border: `1px solid ${BDR}`,
+                        background: SURF,
+                        color: TXT,
+                        fontSize: 12,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Copy EN
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void copyText(rep.sponsor_message.es)}
+                      style={{
+                        padding: "6px 12px",
+                        borderRadius: 8,
+                        border: `1px solid ${BDR}`,
+                        background: SURF,
+                        color: TXT,
+                        fontSize: 12,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Copy ES
+                    </button>
+                  </div>
+                  <p style={{ margin: "0 0 10px", fontSize: 14, lineHeight: 1.55, color: TXT }}>{rep.sponsor_message.en}</p>
+                  <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: MUTED }}>{rep.sponsor_message.es}</p>
+                  <div style={{ marginTop: 10, fontSize: 11, color: MUTED }}>Generated {new Date(rep.generated_at).toLocaleString()}</div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                  <h2 style={{ fontSize: 13, fontWeight: 800, color: MUTED, textTransform: "uppercase", letterSpacing: "0.06em", margin: 0 }}>
+                    Sponsor/CRO intelligence
+                  </h2>
+                  <a
+                    href="/api/reports/sponsor/pdf"
+                    download
+                    style={{
+                      padding: "8px 14px",
+                      borderRadius: 8,
+                      border: `1px solid ${BLU}`,
+                      background: "rgba(56,189,248,0.12)",
+                      color: BLU,
+                      fontSize: 12,
+                      fontWeight: 700,
+                      textDecoration: "none",
+                    }}
+                  >
+                    Download PDF report
+                  </a>
+                </div>
+                <div
                   style={{
-                    padding: "6px 12px",
-                    borderRadius: 8,
-                    border: `1px solid ${BDR}`,
-                    background: SURF,
-                    color: TXT,
-                    fontSize: 12,
-                    fontWeight: 600,
-                    cursor: "pointer",
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))",
+                    gap: 12,
+                    marginBottom: 16,
                   }}
                 >
-                  Copy EN
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void copyText(rep.sponsor_message.es)}
+                  <StatCard label="Active opportunities" value={fmt(rep.operational_counts?.opportunities)} borderColor={BLU} />
+                  <StatCard label="Active studies" value={fmt(rep.operational_counts?.studies)} borderColor={GRN} />
+                  <StatCard label="Revenue generated" value={fmt(rep.operational_counts?.financial_items)} borderColor={GRN} />
+                  <StatCard label="Expected revenue" value={fmt(rep.operational_counts?.opportunities)} borderColor={BLU} />
+                  <StatCard
+                    label="Average response time"
+                    value={fmt(wk.avg_hours_to_contact as number)}
+                    borderColor={metricBorder("avg_hours_to_contact", wk.avg_hours_to_contact as number)}
+                  />
+                  <StatCard label="Startup speed" value="Track startup dates" borderColor={AMB} />
+                </div>
+
+                <div style={{ background: SURF, border: `1px solid ${BDR}`, borderRadius: 12, padding: 16, marginBottom: 20 }}>
+                  <h3 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, color: MUTED, textTransform: "uppercase" }}>Sponsor/CRO overview</h3>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+                    <Insight label="Payment / budget behavior" value="Review Budget/CTA follow-ups and overdue financial items." />
+                    <Insight label="Preferred indications" value={(wk.top_indication as string) || "Add indications from opportunities and studies."} />
+                    <Insight label="Historical issues / notes" value="Record negotiation blockers, delayed replies, startup friction, and payment history." />
+                    <Insight label="Next recommended action" value={rep.sponsor_message.en || "Create a sponsor follow-up task."} />
+                  </div>
+                </div>
+
+                <h3 style={{ fontSize: 13, fontWeight: 800, color: MUTED, textTransform: "uppercase", margin: "0 0 12px" }}>Enrollment metrics (secondary)</h3>
+                <div
                   style={{
-                    padding: "6px 12px",
-                    borderRadius: 8,
-                    border: `1px solid ${BDR}`,
-                    background: SURF,
-                    color: TXT,
-                    fontSize: 12,
-                    fontWeight: 600,
-                    cursor: "pointer",
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))",
+                    gap: 12,
+                    marginBottom: 16,
                   }}
                 >
-                  Copy ES
-                </button>
-              </div>
-              <p style={{ margin: "0 0 10px", fontSize: 14, lineHeight: 1.55, color: TXT }}>{rep.sponsor_message.en}</p>
-              <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: MUTED }}>{rep.sponsor_message.es}</p>
-              <div style={{ marginTop: 10, fontSize: 11, color: MUTED }}>Generated {new Date(rep.generated_at).toLocaleString()}</div>
-            </div>
+                  <StatCard label="Leads this week" value={fmt(wk.leads_this_week as number)} borderColor={BLU} />
+                  <StatCard label="Enrolled" value={fmt(wk.enrolled_this_week as number)} borderColor={GRN} />
+                  <StatCard label="Enrollment rate %" value={fmt(wk.enrollment_rate_pct as number, "%")} borderColor={GRN} />
+                  <StatCard label="Conversion rate %" value={fmt(wk.conversion_rate_pct as number, "%")} borderColor={BLU} />
+                  <StatCard
+                    label="Average hours to contact"
+                    value={fmt(wk.avg_hours_to_contact as number)}
+                    borderColor={metricBorder("avg_hours_to_contact", wk.avg_hours_to_contact as number)}
+                  />
+                </div>
+
+                <h3 style={{ fontSize: 13, fontWeight: 800, color: MUTED, textTransform: "uppercase", margin: "0 0 12px" }}>Source breakdown (30d)</h3>
+                <div style={{ background: SURF, border: `1px solid ${BDR}`, borderRadius: 12, padding: 16, marginBottom: 20 }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                    <thead>
+                      <tr style={{ color: MUTED, textAlign: "left" }}>
+                        <th style={{ padding: "6px 4px" }}>Source</th>
+                        <th style={{ padding: "6px 4px" }}>Total</th>
+                        <th style={{ padding: "6px 4px" }}>Enrolled</th>
+                        <th style={{ padding: "6px 4px" }}>Rate</th>
+                        <th style={{ padding: "6px 4px", width: 120 }}>Bar</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(rep.source_breakdown ?? []).map((s) => (
+                        <tr key={s.source} style={{ borderTop: `1px solid ${BDR}` }}>
+                          <td style={{ padding: "8px 4px" }}>{s.source}</td>
+                          <td style={{ padding: "8px 4px" }}>{s.total}</td>
+                          <td style={{ padding: "8px 4px" }}>{s.enrolled}</td>
+                          <td style={{ padding: "8px 4px" }}>{fmt(s.enrollment_rate_pct, "%")}</td>
+                          <td style={{ padding: "8px 4px" }}>
+                            <div style={{ height: 8, background: "#0f172a", borderRadius: 4, overflow: "hidden" }}>
+                              <div style={{ width: `${Math.min(100, s.enrollment_rate_pct)}%`, height: "100%", background: GRN }} />
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {!rep.source_breakdown?.length && <div style={{ color: MUTED, fontSize: 13 }}>No source data.</div>}
+                </div>
+
+                <div style={{ background: "rgba(56,189,248,0.08)", border: `1px solid ${BLU}`, borderRadius: 12, padding: 16 }}>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+                    <span style={{ fontSize: 12, fontWeight: 800, color: BLU, textTransform: "uppercase" }}>Sponsor message</span>
+                    <button
+                      type="button"
+                      onClick={() => void copyText(rep.sponsor_message.en)}
+                      style={{
+                        padding: "6px 12px",
+                        borderRadius: 8,
+                        border: `1px solid ${BDR}`,
+                        background: SURF,
+                        color: TXT,
+                        fontSize: 12,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Copy EN
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void copyText(rep.sponsor_message.es)}
+                      style={{
+                        padding: "6px 12px",
+                        borderRadius: 8,
+                        border: `1px solid ${BDR}`,
+                        background: SURF,
+                        color: TXT,
+                        fontSize: 12,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Copy ES
+                    </button>
+                  </div>
+                  <p style={{ margin: "0 0 10px", fontSize: 14, lineHeight: 1.55, color: TXT }}>{rep.sponsor_message.en}</p>
+                  <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: MUTED }}>{rep.sponsor_message.es}</p>
+                  <div style={{ marginTop: 10, fontSize: 11, color: MUTED }}>Generated {new Date(rep.generated_at).toLocaleString()}</div>
+                </div>
+              </>
+            )}
           </>
         )}
 

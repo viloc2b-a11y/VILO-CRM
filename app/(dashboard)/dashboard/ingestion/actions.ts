@@ -15,7 +15,15 @@ export type IngestionResult = {
   errors?: string[];
 };
 
-type EntityType = "organization" | "contact" | "opportunity" | "task";
+type EntityType =
+  | "organization"
+  | "contact"
+  | "opportunity"
+  | "study"
+  | "communication"
+  | "patient_lead"
+  | "financial"
+  | "task";
 type CsvRow = Record<string, string>;
 type LooseRow = Record<string, unknown>;
 type LooseError = { message: string } | null;
@@ -86,7 +94,7 @@ async function logActivity(params: {
 
 async function stageRow(params: {
   source_type: "manual" | "csv" | "email" | "pdf" | "api";
-  entity_type: EntityType | "study" | "financial";
+  entity_type: EntityType;
   raw_payload: unknown;
   normalized_payload: unknown;
   validation_status: "pending" | "valid" | "invalid" | "needs_review" | "imported";
@@ -182,13 +190,13 @@ function validateContact(row: CsvRow): string[] {
 
 function validateOpportunity(row: CsvRow): string[] {
   const errors: string[] = [];
-  if (!row.name) errors.push("name is required");
+  if (!row.name && !row.indication) errors.push("name or indication is required");
   if (!row.organization_id && !row.organization_name) {
     errors.push("Organization is required before creating an opportunity.");
   }
   if (!row.stage) errors.push("stage is required");
-  if (!row.next_step) errors.push("next_step is required");
-  if (!row.next_step_date) errors.push("next_step_date is required");
+  if (!row.next_step && !row.notes) errors.push("next_step or notes is required");
+  if (!row.next_step_date && !row.next_follow_up_date) errors.push("next_step_date or next_follow_up_date is required");
   if (row.type && !OPP_TYPES.has(row.type)) errors.push("type must be Study, Biospecimen, IVD, Partnership, or Vendor");
   return errors;
 }
@@ -201,6 +209,81 @@ function validateTask(row: CsvRow): string[] {
   if (row.priority && !PRIORITIES.has(row.priority)) errors.push("priority must be High, Medium, or Low");
   if (!row.next_action) errors.push("next_action is required");
   return errors;
+}
+
+function validateStudy(row: CsvRow): string[] {
+  const errors: string[] = [];
+  if (!row.organization_id) errors.push("organization_id is required");
+  if (!row.protocol_number) errors.push("protocol_number is required");
+  if (!row.indication) errors.push("indication is required");
+  if (!row.status) errors.push("status is required");
+  return errors;
+}
+
+function validateCommunication(row: CsvRow): string[] {
+  const errors: string[] = [];
+  if (!row.organization_id) errors.push("organization_id is required");
+  if (!row.communication_type) errors.push("communication_type is required");
+  if (!row.direction) errors.push("direction is required");
+  if (!row.date) errors.push("date is required");
+  if (!row.topic) errors.push("topic is required");
+  return errors;
+}
+
+function validatePatientLead(row: CsvRow): string[] {
+  const errors: string[] = [];
+  if (!row.full_name) errors.push("full_name is required");
+  if (!row.phone) errors.push("phone is required");
+  if (!row.indication) errors.push("indication is required");
+  if (!row.source) errors.push("source is required");
+  if (!row.status) errors.push("status is required");
+  return errors;
+}
+
+function validateFinancial(row: CsvRow): string[] {
+  const errors: string[] = [];
+  if (!row.organization_id) errors.push("organization_id is required");
+  if (!row.item_type) errors.push("item_type is required");
+  if (!row.amount) errors.push("amount is required");
+  if (!row.status) errors.push("status is required");
+  if (!row.due_date) errors.push("due_date is required");
+  return errors;
+}
+
+function validateEntity(entity: EntityType, row: CsvRow): string[] {
+  if (entity === "organization") return validateOrganization(row);
+  if (entity === "contact") return validateContact(row);
+  if (entity === "opportunity") return validateOpportunity(row);
+  if (entity === "study") return validateStudy(row);
+  if (entity === "communication") return validateCommunication(row);
+  if (entity === "patient_lead") return validatePatientLead(row);
+  if (entity === "financial") return validateFinancial(row);
+  return validateTask(row);
+}
+
+function normalizeStudyStatus(status: string): string {
+  const s = normalize(status);
+  if (s.includes("active")) return "active";
+  if (s.includes("pause")) return "paused";
+  if (s.includes("close") || s.includes("won")) return "closed";
+  return "planning";
+}
+
+function normalizePatientStage(row: CsvRow): string {
+  if (row.enrolled === "true" || row.enrolled === "yes" || row.status.toLowerCase() === "enrolled") return "Enrolled";
+  if (row.screen_failed === "true" || row.screen_failed === "yes" || row.status.toLowerCase().includes("screen")) return "Screen Fail";
+  if (row.contacted_at) return "Responded";
+  return "New Lead";
+}
+
+function normalizeInvoiceStatus(status: string): string {
+  const s = normalize(status);
+  if (s.includes("paid") && !s.includes("partial")) return "paid";
+  if (s.includes("partial")) return "partially_paid";
+  if (s.includes("overdue")) return "overdue";
+  if (s.includes("sent") || s.includes("pending")) return "sent";
+  if (s.includes("void") || s.includes("cancel")) return "void";
+  return "draft";
 }
 
 async function createOrganizationRow(row: CsvRow, activity: "created" | "imported") {
@@ -269,7 +352,7 @@ async function createOpportunityRow(row: CsvRow, activity: "created" | "imported
   if (!org) throw new Error(`Organization not found: ${row.organization_name || row.organization_id}`);
   const orgRow = org as LooseRow;
   const duplicate = await dedupeOpportunity({
-    name: row.name,
+    name: row.name || row.indication,
     orgId: orgRow.id as string,
     organizationName: String(orgRow.name ?? ""),
   });
@@ -291,24 +374,22 @@ async function createOpportunityRow(row: CsvRow, activity: "created" | "imported
       email: null,
       phone: null,
       therapeutic_area: row.indication || null,
-      opportunity_type: dbOpportunityType(row.type || "Study"),
+      opportunity_type: dbOpportunityType(row.type || row.study_type || "Study"),
       source: "Other",
       status: viloStageAppToDb(stage),
       priority: "High",
-      potential_value: row.expected_revenue ? Number(row.expected_revenue) : null,
-      notes: [`Opportunity: ${row.name}`, `Type: ${row.type || "Study"}`, row.next_step].filter(Boolean).join(" | "),
+      potential_value: row.expected_revenue || row.expected_value ? Number(row.expected_revenue || row.expected_value) : null,
+      notes: [
+        `Opportunity: ${row.name || row.indication}`,
+        `Type: ${row.type || row.study_type || "Study"}`,
+        row.next_step ? `Next step: ${row.next_step}` : "",
+        row.owner ? `Owner: ${row.owner}` : "",
+        row.notes || "",
+      ]
+        .filter(Boolean)
+        .join(" | "),
       last_contact_date: row.last_contact_date || null,
-      next_followup_date: row.next_step_date || null,
-      expected_close_date: null,
-      marketing_campaign_id: null,
-      study_id: null,
-      proposal_pdf_path: null,
-      proposal_pdf_generated_at: null,
-      decision_maker_role: row.owner || null,
-      last_interaction_type: "none",
-      next_follow_up: row.next_step || null,
-      relationship_strength: row.probability ? Number(row.probability) : null,
-      enrichment_status: "pending",
+      next_followup_date: row.next_step_date || row.next_follow_up_date || null,
       archived: false,
     })
     .select()
@@ -323,6 +404,136 @@ async function createOpportunityRow(row: CsvRow, activity: "created" | "imported
     description: row.name,
   });
   return { id: oppRow.id as string, duplicate: false };
+}
+
+async function createStudyRow(row: CsvRow, activity: "created" | "imported") {
+  const sb = db(await createServerSideClient());
+  const org = await findOrganization(row.organization_id);
+  if (!org) throw new Error(`Organization not found: ${row.organization_id}`);
+  const orgRow = org as LooseRow;
+  const { data, error } = await sb
+    .from("studies")
+    .insert({
+      name: row.protocol_number ? `${row.protocol_number} - ${row.indication}` : row.indication,
+      protocol_identifier: row.protocol_number,
+      sponsor_display_name: orgRow.name,
+      status: normalizeStudyStatus(row.status),
+      notes: [
+        `Sponsor org_id: ${String(orgRow.id ?? "")}`,
+        row.indication ? `Indication: ${row.indication}` : "",
+        row.notes,
+        row.enrollment_target ? `Enrollment target: ${row.enrollment_target}` : "",
+        row.current_enrolled ? `Current enrolled: ${row.current_enrolled}` : "",
+        row.budget_status ? `Budget status: ${row.budget_status}` : "",
+        row.cta_status ? `CTA status: ${row.cta_status}` : "",
+      ]
+        .filter(Boolean)
+        .join(" | "),
+      archived: false,
+    })
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  const studyRow = singleRow(data);
+  await logActivity({
+    related_type: "study",
+    related_id: studyRow.id as string,
+    activity_type: activity,
+    title: activity === "imported" ? "Study imported from CSV" : "Study created manually",
+    description: row.protocol_number,
+  });
+  return { id: studyRow.id as string, duplicate: false };
+}
+
+async function createCommunicationRow(row: CsvRow, activity: "created" | "imported") {
+  const sb = db(await createServerSideClient());
+  const org = await findOrganization(row.organization_id);
+  if (!org) throw new Error(`Organization not found: ${row.organization_id}`);
+  const { data, error } = await sb
+    .from("communications_log")
+    .insert({
+      org_id: row.organization_id,
+      contact_id: row.contact_id || null,
+      channel: row.communication_type || "other",
+      direction: row.direction || "internal",
+      type: row.topic || "note",
+      subject: row.topic,
+      body: row.notes || null,
+      metadata: { follow_up_needed: row.follow_up_needed || null, ingestion_date: row.date || null },
+      created_at: row.date ? new Date(row.date).toISOString() : new Date().toISOString(),
+    })
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  const commRow = singleRow(data);
+  await logActivity({
+    related_type: "organization",
+    related_id: row.organization_id,
+    activity_type: activity,
+    title: activity === "imported" ? "Communication imported" : "Communication logged manually",
+    description: row.topic,
+  });
+  return { id: commRow.id as string, duplicate: false };
+}
+
+async function createPatientLeadRow(row: CsvRow, activity: "created" | "imported") {
+  const sb = db(await createServerSideClient());
+  const stage = normalizePatientStage(row);
+  const { data, error } = await sb
+    .from("patient_leads")
+    .insert({
+      full_name: row.full_name,
+      phone: row.phone,
+      email: row.email || null,
+      condition_or_study_interest: row.indication,
+      source_campaign: row.source,
+      current_stage: stage,
+      last_contact_date: row.contacted_at ? dateOnly(row.contacted_at) : null,
+      screen_fail_reason: stage === "Screen Fail" ? row.notes || "Screen failed" : null,
+      notes: [`Study ID: ${row.study_id || "none"}`, row.notes].filter(Boolean).join(" | "),
+      archived: false,
+    })
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  const leadRow = singleRow(data);
+  await logActivity({
+    related_type: "patient_lead",
+    related_id: leadRow.id as string,
+    activity_type: activity,
+    title: activity === "imported" ? "Patient lead imported" : "Patient lead created manually",
+    description: row.indication,
+  });
+  return { id: leadRow.id as string, duplicate: false };
+}
+
+async function createFinancialRow(row: CsvRow, activity: "created" | "imported") {
+  const sb = db(await createServerSideClient());
+  const org = await findOrganization(row.organization_id);
+  if (!org) throw new Error(`Organization not found: ${row.organization_id}`);
+  const { data, error } = await sb
+    .from("invoices")
+    .insert({
+      organization_id: row.organization_id,
+      study_id: row.study_id || null,
+      invoice_number: row.invoice_number || null,
+      status: normalizeInvoiceStatus(row.status),
+      amount_usd: Number(row.amount),
+      due_date: row.due_date || null,
+      notes: [`Item type: ${row.item_type}`, row.notes].filter(Boolean).join(" | "),
+    })
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  const financialRow = singleRow(data);
+  await logActivity({
+    related_type: "financial",
+    related_id: financialRow.id as string,
+    activity_type: activity,
+    title: activity === "imported" ? "Financial item imported" : "Financial item created manually",
+    description: `${row.item_type}: ${row.amount}`,
+  });
+  return { id: financialRow.id as string, duplicate: false };
 }
 
 async function createTaskRow(row: CsvRow, activity: "created" | "imported") {
@@ -343,8 +554,8 @@ async function createTaskRow(row: CsvRow, activity: "created" | "imported") {
       priority: row.priority || "Medium",
       due_date: dateOnly(row.due_date),
       done: row.status === "completed",
-      related_type: row.related_type || null,
-      related_id: row.related_id || null,
+      related_type: row.related_type || (row.organization_id ? "organization" : null),
+      related_id: row.related_id || row.organization_id || null,
       next_action: row.next_action || null,
       owner: row.owner || null,
       status: row.status || "open",
@@ -369,14 +580,7 @@ async function createTaskRow(row: CsvRow, activity: "created" | "imported") {
 export async function createManualRecord(entity: EntityType, formData: FormData): Promise<IngestionResult> {
   try {
     const row = Object.fromEntries([...formData.entries()].map(([k, v]) => [k, str(v)])) as CsvRow;
-    const errors =
-      entity === "organization"
-        ? validateOrganization(row)
-        : entity === "contact"
-          ? validateContact(row)
-          : entity === "opportunity"
-            ? validateOpportunity(row)
-            : validateTask(row);
+    const errors = validateEntity(entity, row);
     if (errors.length) {
       await stageRow({
         source_type: "manual",
@@ -395,7 +599,15 @@ export async function createManualRecord(entity: EntityType, formData: FormData)
           ? await createContactRow(row, "created")
           : entity === "opportunity"
             ? await createOpportunityRow(row, "created")
-            : await createTaskRow(row, "created");
+            : entity === "study"
+              ? await createStudyRow(row, "created")
+              : entity === "communication"
+                ? await createCommunicationRow(row, "created")
+                : entity === "patient_lead"
+                  ? await createPatientLeadRow(row, "created")
+                  : entity === "financial"
+                    ? await createFinancialRow(row, "created")
+                    : await createTaskRow(row, "created");
     await stageRow({
       source_type: "manual",
       entity_type: entity,
@@ -413,7 +625,18 @@ export async function createManualRecord(entity: EntityType, formData: FormData)
       ok: true,
       message: result.duplicate ? "Record matched an existing duplicate." : "Record created.",
       recordId: result.id,
-      href: entity === "organization" || entity === "contact" ? "/contacts" : entity === "task" ? "/tasks" : "/vilo",
+      href:
+        entity === "organization" || entity === "contact"
+          ? "/contacts"
+          : entity === "task"
+            ? "/tasks"
+            : entity === "patient_lead"
+              ? "/vitalis"
+              : entity === "study"
+                ? "/clinical-ops"
+                : entity === "financial"
+                  ? "/financials"
+                  : "/vilo",
     };
   } catch (e) {
     const message = e instanceof Error ? e.message : "Could not create record";
@@ -435,14 +658,7 @@ export async function importCsvRows(entity: EntityType, rows: CsvRow[]): Promise
   let staged = 0;
   const errorsOut: string[] = [];
   for (const row of rows) {
-    const errors =
-      entity === "organization"
-        ? validateOrganization(row)
-        : entity === "contact"
-          ? validateContact(row)
-          : entity === "opportunity"
-            ? validateOpportunity(row)
-            : validateTask(row);
+    const errors = validateEntity(entity, row);
     if (errors.length) {
       staged++;
       errorsOut.push(`${row.name || row.title || "Row"}: ${errors.join(", ")}`);

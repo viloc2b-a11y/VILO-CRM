@@ -12,7 +12,7 @@ import { AlertTriangle, CheckCircle2, FileSpreadsheet, Inbox, Keyboard, Mail, Se
 import Link from "next/link";
 import { useMemo, useState, useTransition, type InputHTMLAttributes, type ReactNode } from "react";
 
-type Entity = "organization" | "contact" | "opportunity" | "task";
+type Entity = "organization" | "contact" | "opportunity" | "study" | "communication" | "patient_lead" | "financial" | "task";
 type CsvRow = Record<string, string>;
 
 export type StagingRow = {
@@ -30,18 +30,27 @@ export type StagingRow = {
 
 type OrgOption = { id: string; name: string };
 type ContactOption = { id: string; full_name: string; org_id: string | null };
+type StudyOption = { id: string; name: string };
 
 const ENTITY_LABEL: Record<Entity, string> = {
   organization: "Organizations",
   contact: "Contacts",
   opportunity: "Opportunities",
-  task: "Tasks",
+  study: "Studies",
+  communication: "Communications",
+  patient_lead: "Patient Leads",
+  financial: "Financial Items",
+  task: "Tasks / Follow-ups",
 };
 
 const REQUIRED: Record<Entity, string[]> = {
   organization: ["name", "type"],
   contact: ["name", "email_or_phone", "organization_name"],
   opportunity: ["name", "organization_name", "stage", "next_step", "next_step_date"],
+  study: ["organization_id", "protocol_number", "indication", "status"],
+  communication: ["organization_id", "communication_type", "direction", "date", "topic"],
+  patient_lead: ["full_name", "phone", "indication", "source", "status"],
+  financial: ["organization_id", "item_type", "amount", "status", "due_date"],
   task: ["title", "due_date", "priority", "next_action"],
 };
 
@@ -64,8 +73,13 @@ const FIELD_OPTIONS: Record<Entity, string[]> = {
     "next_step_date",
     "last_contact_date",
   ],
+  study: ["organization_id", "protocol_number", "indication", "status", "startup_date", "enrollment_target", "current_enrolled", "budget_status", "cta_status", "notes"],
+  communication: ["organization_id", "contact_id", "communication_type", "direction", "date", "topic", "follow_up_needed", "notes"],
+  patient_lead: ["study_id", "full_name", "phone", "email", "indication", "source", "status", "contacted_at", "enrolled", "screen_failed", "notes"],
+  financial: ["organization_id", "study_id", "item_type", "amount", "status", "due_date", "notes"],
   task: ["related_type", "related_id", "title", "priority", "due_date", "next_action", "owner", "status"],
 };
+const CSV_ENTITIES: Entity[] = ["organization", "contact", "opportunity", "task"];
 
 function parseCsv(text: string): CsvRow[] {
   const rows: string[][] = [];
@@ -114,6 +128,18 @@ function errorsFor(entity: Entity, row: CsvRow): string[] {
     for (const f of ["name", "stage", "next_step", "next_step_date"]) if (!row[f]) e.push(`${f} required`);
     if (!row.organization_id && !row.organization_name) e.push("organization required");
   }
+  if (entity === "study") {
+    for (const f of ["organization_id", "protocol_number", "indication", "status"]) if (!row[f]) e.push(`${f} required`);
+  }
+  if (entity === "communication") {
+    for (const f of ["organization_id", "communication_type", "direction", "date", "topic"]) if (!row[f]) e.push(`${f} required`);
+  }
+  if (entity === "patient_lead") {
+    for (const f of ["full_name", "phone", "indication", "source", "status"]) if (!row[f]) e.push(`${f} required`);
+  }
+  if (entity === "financial") {
+    for (const f of ["organization_id", "item_type", "amount", "status", "due_date"]) if (!row[f]) e.push(`${f} required`);
+  }
   if (entity === "task") {
     for (const f of ["title", "due_date", "priority", "next_action"]) if (!row[f]) e.push(`${f} required`);
   }
@@ -123,13 +149,17 @@ function errorsFor(entity: Entity, row: CsvRow): string[] {
 export function IngestionCenterClient({
   organizations,
   contacts,
+  studies,
   stagingRows,
   stagingAvailable,
+  availableEntities,
 }: {
   organizations: OrgOption[];
   contacts: ContactOption[];
+  studies: StudyOption[];
   stagingRows: StagingRow[];
   stagingAvailable: boolean;
+  availableEntities: Record<Entity, boolean>;
 }) {
   const [tab, setTab] = useState<"manual" | "csv" | "staging">("manual");
   const [manualEntity, setManualEntity] = useState<Entity>("organization");
@@ -224,6 +254,8 @@ export function IngestionCenterClient({
               entity={manualEntity}
               organizations={organizations}
               contacts={contacts}
+              studies={studies}
+              available={availableEntities[manualEntity]}
               pending={isPending}
               onSubmit={(fd) => {
                 setResult(null);
@@ -244,9 +276,9 @@ export function IngestionCenterClient({
               </p>
             </div>
             <Select className="w-full sm:w-56" value={csvEntity} onChange={(e) => setCsvEntity(e.target.value as Entity)}>
-              {Object.entries(ENTITY_LABEL).map(([key, label]) => (
+              {CSV_ENTITIES.map((key) => (
                 <option key={key} value={key}>
-                  {label}
+                  {ENTITY_LABEL[key]}
                 </option>
               ))}
             </Select>
@@ -322,15 +354,29 @@ function ManualForm({
   entity,
   organizations,
   contacts,
+  studies,
+  available,
   pending,
   onSubmit,
 }: {
   entity: Entity;
   organizations: OrgOption[];
   contacts: ContactOption[];
+  studies: StudyOption[];
+  available: boolean;
   pending: boolean;
   onSubmit: (fd: FormData) => void;
 }) {
+  if (!available) {
+    return (
+      <Empty
+        title={`${ENTITY_LABEL[entity]} not connected yet.`}
+        body="The backing Supabase table is not installed or is not available to this user. Apply the matching migration before creating records here."
+        cta="TODO: connect table"
+      />
+    );
+  }
+
   return (
     <form
       className="space-y-4"
@@ -342,7 +388,11 @@ function ManualForm({
       {entity === "organization" ? <OrganizationFields /> : null}
       {entity === "contact" ? <ContactFields organizations={organizations} /> : null}
       {entity === "opportunity" ? <OpportunityFields organizations={organizations} contacts={contacts} /> : null}
-      {entity === "task" ? <TaskFields /> : null}
+      {entity === "study" ? <StudyFields organizations={organizations} /> : null}
+      {entity === "communication" ? <CommunicationFields organizations={organizations} contacts={contacts} /> : null}
+      {entity === "patient_lead" ? <PatientLeadFields studies={studies} /> : null}
+      {entity === "financial" ? <FinancialFields organizations={organizations} studies={studies} /> : null}
+      {entity === "task" ? <TaskFields organizations={organizations} /> : null}
       <div className="flex justify-end border-t border-clinical-line pt-3">
         <Button type="submit" disabled={pending}>
           {pending ? "Saving..." : `Create ${entity}`}
@@ -387,21 +437,87 @@ function OpportunityFields({ organizations, contacts }: { organizations: OrgOpti
       <Field name="contact_name" label="Contact name fallback" />
       <Field name="name" label="Opportunity name" required />
       <SelectField name="type" label="Type" options={["Study", "Biospecimen", "IVD", "Partnership", "Vendor"]} />
-      <Field name="indication" label="Indication" />
+      <Field name="indication" label="Indication" required />
       <Field name="expected_revenue" label="Expected revenue" type="number" />
       <Field name="probability" label="Probability" type="number" min={0} max={100} />
       <SelectField name="stage" label="Stage" options={[...VILO_STAGES]} />
       <Field name="owner" label="Owner" />
       <Field name="next_step" label="Next step" required />
-      <Field name="next_step_date" label="Next step date" type="date" required />
+      <Field name="next_step_date" label="Next follow-up date" type="date" required />
       <Field name="last_contact_date" label="Last contact date" type="date" />
+      <TextAreaField name="notes" label="Notes" />
     </div>
   );
 }
 
-function TaskFields() {
+function StudyFields({ organizations }: { organizations: OrgOption[] }) {
   return (
     <div className="grid gap-3 md:grid-cols-2">
+      <SelectField name="organization_id" label="Organization" options={organizations.map((o) => ({ value: o.id, label: o.name }))} />
+      <Field name="protocol_number" label="Protocol number" required />
+      <Field name="indication" label="Indication" required />
+      <SelectField name="status" label="Status" options={["planning", "active", "paused", "closed"]} />
+      <Field name="startup_date" label="Startup date" type="date" />
+      <Field name="enrollment_target" label="Enrollment target" type="number" />
+      <Field name="current_enrolled" label="Current enrolled" type="number" />
+      <Field name="budget_status" label="Budget status" />
+      <Field name="cta_status" label="CTA status" />
+      <TextAreaField name="notes" label="Notes" />
+    </div>
+  );
+}
+
+function CommunicationFields({ organizations, contacts }: { organizations: OrgOption[]; contacts: ContactOption[] }) {
+  return (
+    <div className="grid gap-3 md:grid-cols-2">
+      <SelectField name="organization_id" label="Organization" options={organizations.map((o) => ({ value: o.id, label: o.name }))} />
+      <SelectField name="contact_id" label="Contact" options={contacts.map((c) => ({ value: c.id, label: c.full_name }))} />
+      <SelectField name="communication_type" label="Communication type" options={["email", "linkedin", "call", "meeting", "whatsapp", "other"]} />
+      <SelectField name="direction" label="Direction" options={["outbound", "inbound", "internal"]} />
+      <Field name="date" label="Date" type="datetime-local" required />
+      <Field name="topic" label="Topic" required />
+      <SelectField name="follow_up_needed" label="Follow-up needed" options={["no", "yes"]} />
+      <TextAreaField name="notes" label="Notes" />
+    </div>
+  );
+}
+
+function PatientLeadFields({ studies }: { studies: StudyOption[] }) {
+  return (
+    <div className="grid gap-3 md:grid-cols-2">
+      <SelectField name="study_id" label="Study" options={studies.map((s) => ({ value: s.id, label: s.name }))} />
+      <Field name="full_name" label="Full name" required />
+      <Field name="phone" label="Phone" required />
+      <Field name="email" label="Email" type="email" />
+      <Field name="indication" label="Indication" required />
+      <Field name="source" label="Source" required />
+      <SelectField name="status" label="Status" options={["New Lead", "Responded", "Scheduled", "Enrolled", "Screen Fail"]} />
+      <Field name="contacted_at" label="Contacted at" type="datetime-local" />
+      <SelectField name="enrolled" label="Enrolled" options={["no", "yes"]} />
+      <SelectField name="screen_failed" label="Screen failed" options={["no", "yes"]} />
+      <TextAreaField name="notes" label="Notes" />
+    </div>
+  );
+}
+
+function FinancialFields({ organizations, studies }: { organizations: OrgOption[]; studies: StudyOption[] }) {
+  return (
+    <div className="grid gap-3 md:grid-cols-2">
+      <SelectField name="organization_id" label="Organization" options={organizations.map((o) => ({ value: o.id, label: o.name }))} />
+      <SelectField name="study_id" label="Study" options={studies.map((s) => ({ value: s.id, label: s.name }))} />
+      <Field name="item_type" label="Item type" required />
+      <Field name="amount" label="Amount" type="number" required />
+      <SelectField name="status" label="Status" options={["draft", "sent", "partially_paid", "paid", "overdue", "void"]} />
+      <Field name="due_date" label="Due date" type="date" required />
+      <TextAreaField name="notes" label="Notes" />
+    </div>
+  );
+}
+
+function TaskFields({ organizations }: { organizations: OrgOption[] }) {
+  return (
+    <div className="grid gap-3 md:grid-cols-2">
+      <SelectField name="organization_id" label="Organization" options={organizations.map((o) => ({ value: o.id, label: o.name }))} />
       <SelectField name="related_type" label="Related record type" options={["opportunity", "patient", "organization", "contact"]} />
       <Field name="related_id" label="Related record id" />
       <Field name="title" label="Title" required />
@@ -410,6 +526,7 @@ function TaskFields() {
       <Field name="next_action" label="Next action" required />
       <Field name="owner" label="Owner" />
       <SelectField name="status" label="Status" options={["open", "in_progress", "completed"]} />
+      <TextAreaField name="notes" label="Notes" />
     </div>
   );
 }
